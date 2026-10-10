@@ -1,11 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import ErrorBoundary from './components/ErrorBoundary';
+import { installDiagnostics } from './lib/diagnostics';
 import './index.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const root = document.getElementById('root');
+installDiagnostics(root);
+
+ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 );
 

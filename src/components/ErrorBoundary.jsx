@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import { RotateCcw, TriangleAlert } from 'lucide-react';
+import { recordError } from '../lib/diagnostics';
 
 /**
  * Si una pantalla falla, muestra el error y un botón para reintentar
@@ -14,6 +15,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('Bookora: error en pantalla', error, info?.componentStack);
+    recordError(`${error?.stack || error}${info?.componentStack ? `\n${info.componentStack.slice(0, 300)}` : ''}`);
   }
 
   render() {
