@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tokens de color (RGB sin comas para que Tailwind pueda aplicar opacidad).
+   Para cambiar el acento plateado por dorado: --accent: 201 164 104; */
+:root {
+  --bg: 0 0 0;
+  --surface: 20 20 22;
+  --surface-2: 30 30 33;
+  --line: 44 44 48;
+  --ink: 242 242 244;
+  --muted: 150 150 158;
+  --accent: 206 209 216;
+  --accent-ink: 10 10 11;
+  --ok: 74 201 140;
+  --warn: 240 184 76;
+  --bad: 240 98 98;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+@layer components {
+  /* Botón principal "plateado" (degradado metálico como el logo) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 font-semibold text-accent-ink
+      transition active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100;
+    background: linear-gradient(180deg, #f3f4f6 0%, #c8ccd3 55%, #9ea3ac 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 20px -8px rgba(206, 209, 216, 0.45);
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface2 px-5 py-3.5
+      font-semibold text-ink transition active:scale-[0.98] disabled:opacity-40;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-medium text-accent transition active:opacity-70;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-bad/40 bg-bad/10 px-5 py-3.5
+      font-semibold text-bad transition active:scale-[0.98];
+  }
+  .card {
+    @apply rounded-xl2 border border-line/70 bg-surface;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-ink placeholder:text-muted/70
+      outline-none transition focus:border-accent/70;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted;
+  }
+  .chip {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm
+      text-ink/90 transition;
+  }
+  .chip-active {
+    @apply border-transparent text-accent-ink;
+    background: linear-gradient(180deg, #eef0f2, #b9bdc5);
+  }
+  .silver-text {
+    background: linear-gradient(180deg, #ffffff 0%, #c9ccd3 60%, #8e939c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@keyframes toast-in {
+  from { transform: translateY(-12px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-toast { animation: toast-in 0.25s ease-out; }
+.animate-sheet { animation: sheet-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.animate-fade { animation: fade-in 0.2s ease-out; }
