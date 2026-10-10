@@ -25,7 +25,13 @@ import BarberSettings from './pages/barber/BarberSettings';
 // falla, aísla el error (se reinicia al navegar a otra).
 function Screen({ children }) {
   const { pathname } = useLocation();
-  useLayoutEffect(() => window.scrollTo(0, 0), [pathname]);
+  useLayoutEffect(() => {
+    // Con llaves a propósito: si el efecto devolviera el resultado de scrollTo,
+    // React lo trataría como función de limpieza. En algunos navegadores (o con
+    // scripts inyectados) scrollTo devuelve un valor y la app se caía con
+    // "n is not a function" al cambiar de pantalla.
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
 }
 
