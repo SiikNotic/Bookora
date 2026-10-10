@@ -18,7 +18,7 @@ const BARBER_TABS = [
 
 function BottomNav({ tabs }) {
   return (
-    <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-line/60 bg-bg/90 backdrop-blur">
+    <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-line/60 bg-bg">
       <div className="flex">
         {tabs.map(([to, label, Icon]) => (
           <NavLink

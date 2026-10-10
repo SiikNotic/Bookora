@@ -190,7 +190,7 @@ export default function Booking() {
         )}
       </div>
 
-      <div className="pb-safe fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-line/60 bg-bg/90 px-4 pt-3 backdrop-blur">
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-line/60 bg-bg px-4 pt-3">
         <p className="truncate text-sm text-muted first-letter:uppercase">
           {time ? `${formatDateLong(date)} · ${formatTime(time)}` : 'Elige fecha y hora'}
         </p>

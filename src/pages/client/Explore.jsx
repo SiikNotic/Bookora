@@ -119,12 +119,12 @@ export default function Explore() {
                     e.preventDefault();
                     actions.toggleFavorite(b.id);
                   }}
-                  className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/50 backdrop-blur"
+                  className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/60"
                 >
                   <Heart size={18} className={fav ? 'fill-accent text-accent' : 'text-ink'} />
                 </button>
                 {openToday && (
-                  <span className="absolute left-3 top-3 rounded-full bg-ok/20 px-2.5 py-1 text-xs font-medium text-ok backdrop-blur">
+                  <span className="absolute left-3 top-3 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium text-ok">
                     Turnos hoy
                   </span>
                 )}

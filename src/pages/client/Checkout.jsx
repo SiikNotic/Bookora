@@ -168,7 +168,7 @@ export default function Checkout() {
         </div>
       </div>
 
-      <div className="pb-safe fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-line/60 bg-bg/90 px-4 pt-3 backdrop-blur">
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-line/60 bg-bg px-4 pt-3">
         <button disabled={!canPay || processing} onClick={pay} className="btn-primary mb-3 w-full">
           {processing ? (
             <>

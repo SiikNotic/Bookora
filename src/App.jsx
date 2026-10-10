@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import ErrorBoundary from './components/ErrorBoundary';
 import { RoleGuard, TabsLayout } from './components/Layout';
 import { Toasts } from './components/ui';
 import { AppStoreProvider } from './store/AppStore';
@@ -20,10 +21,12 @@ import Payments from './pages/barber/Payments';
 import Reviews from './pages/barber/Reviews';
 import BarberSettings from './pages/barber/BarberSettings';
 
-function ScrollToTop() {
+// Al cambiar de pantalla: vuelve arriba antes de pintar y, si una pantalla
+// falla, aísla el error (se reinicia al navegar a otra).
+function Screen({ children }) {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
-  return null;
+  useLayoutEffect(() => window.scrollTo(0, 0), [pathname]);
+  return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
 }
 
 // HashRouter: las rutas viven tras el "#", así funciona igual como PWA
@@ -32,38 +35,39 @@ export default function App() {
   return (
     <AppStoreProvider>
       <HashRouter>
-        <ScrollToTop />
         <div className="relative mx-auto min-h-full max-w-md bg-bg">
-          <Routes>
-            <Route path="/" element={<Welcome />} />
+          <Screen>
+            <Routes>
+              <Route path="/" element={<Welcome />} />
 
-            <Route element={<TabsLayout role="cliente" />}>
-              <Route path="/cliente" element={<Explore />} />
-              <Route path="/cliente/citas" element={<MyBookings />} />
-              <Route path="/cliente/perfil" element={<ClientProfile />} />
-            </Route>
-            <Route element={<RoleGuard role="cliente" />}>
-              <Route path="/cliente/barbero/:id" element={<BarberProfile />} />
-              <Route path="/cliente/reservar/:id" element={<Booking />} />
-              <Route path="/cliente/pago" element={<Checkout />} />
-              <Route path="/cliente/confirmada/:bookingId" element={<BookingSuccess />} />
-              <Route path="/cliente/resena/:bookingId" element={<Review />} />
-            </Route>
+              <Route element={<TabsLayout role="cliente" />}>
+                <Route path="/cliente" element={<Explore />} />
+                <Route path="/cliente/citas" element={<MyBookings />} />
+                <Route path="/cliente/perfil" element={<ClientProfile />} />
+              </Route>
+              <Route element={<RoleGuard role="cliente" />}>
+                <Route path="/cliente/barbero/:id" element={<BarberProfile />} />
+                <Route path="/cliente/reservar/:id" element={<Booking />} />
+                <Route path="/cliente/pago" element={<Checkout />} />
+                <Route path="/cliente/confirmada/:bookingId" element={<BookingSuccess />} />
+                <Route path="/cliente/resena/:bookingId" element={<Review />} />
+              </Route>
 
-            <Route element={<TabsLayout role="barbero" />}>
-              <Route path="/barbero" element={<Dashboard />} />
-              <Route path="/barbero/agenda" element={<Agenda />} />
-              <Route path="/barbero/servicios" element={<Services />} />
-              <Route path="/barbero/portafolio" element={<Portfolio />} />
-              <Route path="/barbero/pagos" element={<Payments />} />
-            </Route>
-            <Route element={<RoleGuard role="barbero" />}>
-              <Route path="/barbero/resenas" element={<Reviews />} />
-              <Route path="/barbero/perfil" element={<BarberSettings />} />
-            </Route>
+              <Route element={<TabsLayout role="barbero" />}>
+                <Route path="/barbero" element={<Dashboard />} />
+                <Route path="/barbero/agenda" element={<Agenda />} />
+                <Route path="/barbero/servicios" element={<Services />} />
+                <Route path="/barbero/portafolio" element={<Portfolio />} />
+                <Route path="/barbero/pagos" element={<Payments />} />
+              </Route>
+              <Route element={<RoleGuard role="barbero" />}>
+                <Route path="/barbero/resenas" element={<Reviews />} />
+                <Route path="/barbero/perfil" element={<BarberSettings />} />
+              </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Screen>
         </div>
         <Toasts />
       </HashRouter>

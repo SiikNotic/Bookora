@@ -19,11 +19,7 @@ export function LogoMark({ className = 'h-10' }) {
 export function TopBar({ title, back, right, transparent = false }) {
   const nav = useNavigate();
   return (
-    <header
-      className={`pt-safe top-0 z-30 ${
-        transparent ? 'absolute inset-x-0' : 'sticky border-b border-line/50 bg-bg/85 backdrop-blur'
-      }`}
-    >
+    <header className={`pt-safe top-0 z-30 ${transparent ? 'absolute inset-x-0' : 'sticky border-b border-line/50 bg-bg'}`}>
       <div className="flex h-14 items-center gap-2 px-3">
         {back && (
           <button
@@ -208,7 +204,7 @@ export function Toasts() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="animate-toast flex w-full max-w-sm items-center gap-2 rounded-xl border border-line bg-surface2/95 px-4 py-3 text-sm shadow-2xl backdrop-blur"
+          className="animate-toast flex w-full max-w-sm items-center gap-2 rounded-xl border border-line bg-surface2/95 px-4 py-3 text-sm shadow-2xl"
         >
           {t.tone === 'warn' ? (
             <TriangleAlert size={18} className="shrink-0 text-warn" />
