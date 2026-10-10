@@ -28,9 +28,7 @@ export function getAvailableSlots({ barber, date, duration, bookings, excludeBoo
   const breakEnd = day.breakEnd ? toMinutes(day.breakEnd) : null;
 
   const busy = bookings
-    .filter(
-      (b) => b.barberId === barber.id && b.date === date && b.status !== 'cancelada' && b.id !== excludeBookingId,
-    )
+    .filter((b) => b.barberId === barber.id && b.date === date && b.status !== 'cancelada' && b.id !== excludeBookingId)
     .map((b) => [toMinutes(b.time), toMinutes(b.time) + b.duration]);
   if (breakStart !== null && breakEnd !== null) busy.push([breakStart, breakEnd]);
 
