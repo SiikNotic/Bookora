@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, LogOut, RotateCcw, UserRound } from 'lucide-react';
+import DiagnosticsCard from '../../components/DiagnosticsCard';
 import { Avatar, Confirm, TopBar } from '../../components/ui';
 import { MUNICIPIOS } from '../../data/demoData';
 import { resizeImage } from '../../lib/images';
@@ -110,6 +111,7 @@ export default function BarberSettings() {
           <MenuButton icon={RotateCcw} label="Reiniciar datos de la demo" onClick={() => setConfirmReset(true)} />
           <MenuButton icon={LogOut} label="Salir" onClick={exit} />
         </div>
+        <DiagnosticsCard />
       </div>
 
       <Confirm

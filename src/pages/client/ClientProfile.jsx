@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight, Heart, LogOut, RotateCcw, Scissors, Smartphone } from 'lucide-react';
+import DiagnosticsCard from '../../components/DiagnosticsCard';
 import { Avatar, Confirm, TopBar } from '../../components/ui';
 import { effectiveStatus } from '../../lib/slots';
 import { getBarber, useStore } from '../../store/AppStore';
@@ -101,6 +102,7 @@ export default function ClientProfile() {
             }}
           />
         </div>
+        <DiagnosticsCard />
         <p className="py-8 text-center text-xs text-muted">Bookora · versión demo 0.1</p>
       </div>
 
