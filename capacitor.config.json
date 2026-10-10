@@ -1,0 +1,8 @@
+{
+  "appId": "pr.bookora.app",
+  "appName": "Bookora",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#000000"
+  }
+}
