@@ -2,8 +2,8 @@
 // - Guarda en caché el "app shell" para que la app abra sin conexión.
 // - Navegación: red primero, caché como respaldo.
 // - Archivos estáticos (JS/CSS/íconos): caché primero.
-// Sube CACHE cuando cambies este archivo para forzar la actualización.
-const CACHE = 'bookora-v4';
+// Sube CACHE cuando cambies este archivo (o el manifest) para forzar la actualización.
+const CACHE = 'bookora-v5';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
