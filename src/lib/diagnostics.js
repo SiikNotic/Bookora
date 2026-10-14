@@ -52,13 +52,12 @@ export function installDiagnostics(root) {
       const last = Number(sessionStorage.getItem(RELOAD_KEY)) || 0;
       if (Date.now() - last < 15000) {
         // Ya recargamos hace poco: no entramos en bucle, mostramos un aviso.
-        root.insertAdjacentHTML(
-          'beforeend',
-          `<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center;color:#f2f2f4;font-family:system-ui,sans-serif">
-            <p style="font-size:18px;font-weight:600">La pantalla no cargó</p>
-            <button onclick="location.reload()" style="padding:12px 24px;border-radius:12px;border:0;background:#ced1d8;color:#0a0a0b;font-weight:600;font-size:16px">Recargar</button>
-          </div>`,
-        );
+        // Clases + addEventListener (sin style/onclick en línea, compatible con la CSP)
+        const box = document.createElement('div');
+        box.className = 'flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center text-ink';
+        box.innerHTML = '<p class="text-lg font-semibold">La pantalla no cargó</p><button class="btn-primary">Recargar</button>';
+        box.querySelector('button').addEventListener('click', () => location.reload());
+        root.append(box);
         return;
       }
       sessionStorage.setItem(RELOAD_KEY, String(Date.now()));

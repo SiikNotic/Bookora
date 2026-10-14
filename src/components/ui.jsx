@@ -37,6 +37,19 @@ export function TopBar({ title, back, right, transparent = false }) {
   );
 }
 
+// Clases fijas por tamaño (sin estilos en línea, para que la CSP no los bloquee)
+const AVATAR_SIZES = {
+  36: 'h-9 w-9',
+  40: 'h-10 w-10',
+  44: 'h-11 w-11',
+  48: 'h-12 w-12',
+  52: 'h-[52px] w-[52px]',
+  64: 'h-16 w-16',
+  72: 'h-[72px] w-[72px]',
+  84: 'h-[84px] w-[84px]',
+  96: 'h-24 w-24',
+};
+
 export function Avatar({ name, src, size = 48, className = '' }) {
   return (
     <img
@@ -44,8 +57,7 @@ export function Avatar({ name, src, size = 48, className = '' }) {
       alt={name}
       width={size}
       height={size}
-      style={{ width: size, height: size }}
-      className={`shrink-0 rounded-full object-cover ring-1 ring-line ${className}`}
+      className={`${AVATAR_SIZES[size] || AVATAR_SIZES[48]} shrink-0 rounded-full object-cover ring-1 ring-line ${className}`}
     />
   );
 }
