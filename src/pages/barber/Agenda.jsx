@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { CalendarX2 } from 'lucide-react';
-import { Confirm, EmptyState, LoadError, Loading, Segmented, StatusBadge, Toggle, TopBar } from '../../components/ui';
-import { barberBookings, cancelBooking, markPaid, refundBooking, updateBarber } from '../../lib/api';
+import { Confirm, EmptyState, LoadError, Loading, Segmented, Sheet, StatusBadge, Toggle, TopBar } from '../../components/ui';
+import { barberBookings, cancelBooking, markPaid, proposeReschedule, refundBooking, updateBarber } from '../../lib/api';
 import {
   addDays,
   DAY_NAMES,
   DAY_SHORT,
   formatDateLong,
+  formatDateShort,
   formatTime,
   fromISODate,
   fromMinutes,
@@ -14,7 +15,7 @@ import {
   today,
 } from '../../lib/dates';
 import { duration, money } from '../../lib/format';
-import { effectiveStatus, isOpenOn } from '../../lib/slots';
+import { effectiveStatus, getAvailableSlots, isOpenOn } from '../../lib/slots';
 import { useAsync, useStore } from '../../store/AppStore';
 import { BarberGate, useMyBarber } from './Dashboard';
 
@@ -46,6 +47,7 @@ function Appointments({ me }) {
   const days = useMemo(() => Array.from({ length: 21 }, (_, i) => addDays(today(), i - 3)), []);
   const [date, setDate] = useState(today());
   const [toCancel, setToCancel] = useState(null);
+  const [toMove, setToMove] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const res = useAsync(() => barberBookings(days[0], days[days.length - 1]), [days]);
 
@@ -131,6 +133,11 @@ function Appointments({ me }) {
                     {b.serviceName} · {duration(b.duration)} · {money(b.price + b.tip)}
                     {b.rescheduled && ' · reprogramada'}
                   </p>
+                  {st === 'confirmada' && b.proposed && (
+                    <p className="mt-1 text-xs text-warn">
+                      Propusiste {formatDateShort(b.proposed.date)} a las {formatTime(b.proposed.time)} · esperando al cliente
+                    </p>
+                  )}
                   {st !== 'cancelada' && (
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className={`text-xs ${b.paymentStatus === 'pagado' ? 'text-ok' : 'text-warn'}`}>
@@ -150,6 +157,11 @@ function Appointments({ me }) {
                             onClick={() => run(b, () => markPaid(b.id), 'Marcada como cobrada')}
                           >
                             Cobrada
+                          </button>
+                        )}
+                        {st === 'confirmada' && (
+                          <button disabled={busyId === b.id} className="chip py-1 text-xs" onClick={() => setToMove(b)}>
+                            Cambiar hora
                           </button>
                         )}
                         {st === 'confirmada' && (
@@ -204,7 +216,77 @@ function Appointments({ me }) {
           )
         }
       />
+      <ProposeSheet
+        booking={toMove}
+        me={me}
+        bookings={mine}
+        days={days.filter((d) => d >= today())}
+        onClose={() => setToMove(null)}
+        onPick={(d, t) => {
+          const b = toMove;
+          setToMove(null);
+          run(b, () => proposeReschedule(b.id, d, t), 'Propuesta enviada. El cliente debe aceptarla.');
+        }}
+      />
     </>
+  );
+}
+
+/** El barbero elige otra hora libre; la cita no cambia hasta que el cliente acepte. */
+function ProposeSheet({ booking, me, bookings, days, onClose, onPick }) {
+  const [date, setDate] = useState(null);
+  const open = Boolean(booking);
+  const d = date || booking?.date;
+  const slots = open
+    ? getAvailableSlots({ barber: me, date: d, duration: booking.duration, bookings, excludeBookingId: booking.id }).filter(
+        (t) => !(d === booking.date && t === booking.time),
+      )
+    : [];
+  const close = () => {
+    setDate(null);
+    onClose();
+  };
+
+  return (
+    <Sheet open={open} onClose={close} title="Proponer otra hora">
+      {open && (
+        <>
+          <p className="text-sm text-muted">
+            {booking.clientName} · {booking.serviceName}. Ahora: {formatDateShort(booking.date)} a las{' '}
+            {formatTime(booking.time)}. El cliente recibirá la propuesta y podrá aceptarla o rechazarla.
+          </p>
+          <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+            {days.map((x) => (
+              <button
+                key={x}
+                onClick={() => setDate(x)}
+                className={`flex w-14 shrink-0 flex-col items-center rounded-xl border py-2 ${
+                  x === d ? 'chip-active' : 'border-line bg-surface2'
+                } ${isOpenOn(me, x) ? '' : 'opacity-40'}`}
+              >
+                <span className="text-xs">{x === today() ? 'Hoy' : DAY_SHORT[fromISODate(x).getDay()]}</span>
+                <span className="font-semibold">{fromISODate(x).getDate()}</span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {slots.map((t) => (
+              <button
+                key={t}
+                className="chip justify-center py-2"
+                onClick={() => {
+                  setDate(null);
+                  onPick(d, t);
+                }}
+              >
+                {formatTime(t)}
+              </button>
+            ))}
+          </div>
+          {!slots.length && <p className="mt-4 text-center text-sm text-muted">No hay turnos libres este día.</p>}
+        </>
+      )}
+    </Sheet>
   );
 }
 

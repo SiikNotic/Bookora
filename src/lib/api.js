@@ -1,6 +1,7 @@
 // Acceso a datos (Supabase). Las pantallas usan estas funciones y reciben objetos
 // ya adaptados a la app (fechas en hora de PR, números como Number, etc.).
 import { supabase } from './supabase';
+import { forgetPushToken } from './push';
 import { addDays, toPR, toTimestamp } from './dates';
 
 /** Devuelve data o lanza un Error con el mensaje del servidor (en español). */
@@ -83,6 +84,8 @@ export function mapBooking(r) {
     paymentStatus: r.payment_status,
     paidAt: r.paid_at,
     rescheduled: r.rescheduled,
+    // Hora nueva que propuso el barbero y el cliente aún no responde
+    proposed: r.proposed_starts_at ? toPR(r.proposed_starts_at) : null,
     barber: r.barbers
       ? {
           id: r.barber_id,
@@ -135,6 +138,7 @@ export async function resetPassword(email) {
 }
 
 export async function signOut() {
+  await forgetPushToken().catch(() => {});
   await supabase.auth.signOut();
 }
 
@@ -259,6 +263,17 @@ export async function reschedule(bookingId, date, time) {
   return mapBooking(
     must(await supabase.rpc('reschedule_booking', { p_booking_id: bookingId, p_starts_at: toTimestamp(date, time) })),
   );
+}
+
+/** El barbero propone otra hora; el cliente la acepta o la rechaza */
+export async function proposeReschedule(bookingId, date, time) {
+  return mapBooking(
+    must(await supabase.rpc('propose_reschedule', { p_booking_id: bookingId, p_starts_at: toTimestamp(date, time) })),
+  );
+}
+
+export async function respondProposal(bookingId, accept) {
+  return mapBooking(must(await supabase.rpc('respond_proposal', { p_booking_id: bookingId, p_accept: accept })));
 }
 
 export async function cancelBooking(bookingId) {

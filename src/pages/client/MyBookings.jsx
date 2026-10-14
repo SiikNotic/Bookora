@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CalendarDays, MapPin, Star } from 'lucide-react';
 import { Avatar, Confirm, EmptyState, LoadError, Loading, Segmented, StatusBadge, TopBar } from '../../components/ui';
-import { cancelBooking, myBookings, refundBooking, startCheckout } from '../../lib/api';
+import { cancelBooking, myBookings, refundBooking, respondProposal, startCheckout } from '../../lib/api';
 import { formatDateShort, formatTime } from '../../lib/dates';
 import { duration, money } from '../../lib/format';
 import { effectiveStatus } from '../../lib/slots';
@@ -117,6 +117,33 @@ export default function MyBookings() {
                   </div>
                 </div>
 
+                {b.effective === 'confirmada' && b.proposed && (
+                  <div className="mt-3 rounded-xl border border-warn/40 bg-warn/10 p-3">
+                    <p className="text-sm">
+                      Tu barbero propone cambiar la cita al{' '}
+                      <span className="font-semibold">
+                        {formatDateShort(b.proposed.date)} a las {formatTime(b.proposed.time)}
+                      </span>
+                      .
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        disabled={busyId === b.id}
+                        className="btn-secondary py-2 text-sm"
+                        onClick={() => run(b, () => respondProposal(b.id, false), 'Rechazado: tu cita sigue igual')}
+                      >
+                        Rechazar
+                      </button>
+                      <button
+                        disabled={busyId === b.id}
+                        className="btn-primary py-2 text-sm"
+                        onClick={() => run(b, () => respondProposal(b.id, true), 'Cita cambiada a la nueva hora')}
+                      >
+                        Aceptar
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {unpaidOnline && (
                   <button disabled={busyId === b.id} className="btn-primary mt-3 w-full py-2.5 text-sm" onClick={() => payNow(b)}>
                     Completar pago en línea
