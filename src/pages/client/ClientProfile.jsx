@@ -1,123 +1,101 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, Heart, LogOut, RotateCcw, Scissors, Smartphone } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronRight, Heart, LogOut } from 'lucide-react';
 import DiagnosticsCard from '../../components/DiagnosticsCard';
-import { Avatar, Confirm, TopBar } from '../../components/ui';
-import { effectiveStatus } from '../../lib/slots';
-import { getBarber, useStore } from '../../store/AppStore';
+import NotificationSettings from '../../components/NotificationSettings';
+import { Avatar, TopBar } from '../../components/ui';
+import { listBarbers, signOut, updateProfile } from '../../lib/api';
+import { useFavorites } from '../../lib/favorites';
+import { useAsync, useStore } from '../../store/AppStore';
 
 export default function ClientProfile() {
-  const { state, actions } = useStore();
-  const nav = useNavigate();
-  const [name, setName] = useState(state.clientName);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const { session, profile, refreshProfile, toast } = useStore();
+  const [form, setForm] = useState({ full_name: profile?.full_name || '', phone: profile?.phone || '' });
+  const [saving, setSaving] = useState(false);
+  const [favorites] = useFavorites();
+  const barbers = useAsync(listBarbers);
+  const favBarbers = (barbers.data || []).filter((b) => favorites.includes(b.id));
+  const changed = form.full_name.trim() !== (profile?.full_name || '') || form.phone.trim() !== (profile?.phone || '');
 
-  const mine = state.bookings.filter((b) => b.isMe);
-  const done = mine.filter((b) => effectiveStatus(b) === 'completada').length;
-  const reviews = state.reviews.filter((r) => mine.some((b) => b.id === r.bookingId)).length;
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await updateProfile(profile.id, { full_name: form.full_name.trim(), phone: form.phone.trim() || null });
+      await refreshProfile();
+      toast('Perfil actualizado');
+    } catch (err) {
+      toast(err.message, 'warn');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
       <TopBar title="Perfil" />
       <div className="px-4 pt-6">
         <div className="flex items-center gap-4">
-          <Avatar name={state.clientName} size={64} />
-          <div className="flex-1">
-            <p className="text-lg font-semibold">{state.clientName}</p>
-            <p className="text-sm text-muted">Cuenta demo de cliente</p>
+          <Avatar name={profile?.full_name || 'Cliente'} size={64} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-semibold">{profile?.full_name}</p>
+            <p className="truncate text-sm text-muted">{session?.user?.email}</p>
           </div>
         </div>
 
-        <div className="card mt-5 grid grid-cols-3 divide-x divide-line/70 py-3 text-center">
-          <div>
-            <p className="text-lg font-semibold">{mine.length}</p>
-            <p className="text-xs text-muted">Citas</p>
-          </div>
-          <div>
-            <p className="text-lg font-semibold">{done}</p>
-            <p className="text-xs text-muted">Completadas</p>
-          </div>
-          <div>
-            <p className="text-lg font-semibold">{reviews}</p>
-            <p className="text-xs text-muted">Reseñas</p>
-          </div>
-        </div>
-
-        <label className="mt-6 block">
-          <span className="label">Tu nombre</span>
-          <div className="flex gap-2">
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
-            <button
-              className="btn-secondary px-4"
-              disabled={!name.trim() || name.trim() === state.clientName}
-              onClick={() => {
-                actions.setClientName(name.trim());
-                actions.toast('Nombre actualizado');
-              }}
-            >
-              Guardar
-            </button>
-          </div>
-        </label>
+        <form onSubmit={save} className="mt-6 space-y-3">
+          <label className="block">
+            <span className="label">Nombre y apellido</span>
+            <input
+              className="input"
+              value={form.full_name}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              maxLength={60}
+            />
+          </label>
+          <label className="block">
+            <span className="label">Teléfono (opcional)</span>
+            <input
+              className="input"
+              inputMode="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              maxLength={25}
+            />
+          </label>
+          <button
+            type="submit"
+            className="btn-secondary w-full"
+            disabled={!changed || form.full_name.trim().length < 2 || saving}
+          >
+            Guardar
+          </button>
+        </form>
 
         <h2 className="mb-3 mt-7 flex items-center gap-2 font-semibold">
           <Heart size={16} /> Favoritos
         </h2>
         <div className="card divide-y divide-line/60">
-          {state.favorites.map((id) => {
-            const b = getBarber(state, id);
-            if (!b) return null;
-            return (
-              <Link key={id} to={`/cliente/barbero/${id}`} className="flex items-center gap-3 p-3">
-                <Avatar name={b.name} src={b.avatar} size={40} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{b.name}</span>
-                  <span className="block truncate text-xs text-muted">{b.municipio}</span>
-                </span>
-                <ChevronRight size={18} className="text-muted" />
-              </Link>
-            );
-          })}
-          {!state.favorites.length && <p className="p-4 text-sm text-muted">Toca el ♥ en un barbero para guardarlo aquí.</p>}
+          {favBarbers.map((b) => (
+            <Link key={b.id} to={`/cliente/barbero/${b.id}`} className="flex items-center gap-3 p-3">
+              <Avatar name={b.name} src={b.avatar} size={40} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{b.name}</span>
+                <span className="block truncate text-xs text-muted">{b.municipio}</span>
+              </span>
+              <ChevronRight size={18} className="text-muted" />
+            </Link>
+          ))}
+          {!favBarbers.length && <p className="p-4 text-sm text-muted">Toca el ♥ en un barbero para guardarlo aquí.</p>}
         </div>
 
-        <h2 className="mb-3 mt-7 font-semibold">Demo</h2>
-        <div className="card divide-y divide-line/60">
-          <MenuButton
-            icon={Scissors}
-            label="Cambiar a modo barbero"
-            onClick={() => {
-              actions.logout();
-              nav('/');
-            }}
-          />
-          <MenuButton icon={Smartphone} label="Instalar en Android" hint="Menú ⋮ de Chrome → Instalar app" />
-          <MenuButton icon={RotateCcw} label="Reiniciar datos de la demo" onClick={() => setConfirmReset(true)} />
-          <MenuButton
-            icon={LogOut}
-            label="Salir"
-            onClick={() => {
-              actions.logout();
-              nav('/');
-            }}
-          />
+        <div className="card mt-7 divide-y divide-line/60">
+          <MenuButton icon={LogOut} label="Cerrar sesión" onClick={() => signOut()} />
         </div>
+        <NotificationSettings />
         <DiagnosticsCard />
-        <p className="py-8 text-center text-xs text-muted">Bookora · versión demo 0.1</p>
+        <p className="py-8 text-center text-xs text-muted">Bookora · versión {import.meta.env.VITE_APP_VERSION || '1.0'}</p>
       </div>
-
-      <Confirm
-        open={confirmReset}
-        onClose={() => setConfirmReset(false)}
-        title="¿Reiniciar la demo?"
-        text="Se borrarán tus citas, reseñas y cambios, y se cargarán de nuevo los datos de ejemplo."
-        confirmLabel="Reiniciar"
-        danger
-        onConfirm={() => {
-          actions.resetDemo();
-          actions.toast('Demo reiniciada');
-        }}
-      />
     </div>
   );
 }

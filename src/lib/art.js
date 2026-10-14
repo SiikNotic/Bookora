@@ -29,21 +29,6 @@ function hash(str) {
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
-/** Tarjeta de portafolio: fondo con degradado, rayas de "barber pole" y un motivo. */
-export function portfolioArt(seed, label, motif = 'tijera') {
-  const h = hash(seed);
-  const [c1, c2, ink] = PALETTES[h % PALETTES.length];
-  const angle = (h % 60) - 30;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
-<defs><radialGradient id="g" cx="${30 + (h % 40)}%" cy="30%" r="90%"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></radialGradient>
-<pattern id="p" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(${angle})"><rect width="11" height="22" fill="${ink}" opacity=".05"/></pattern></defs>
-<rect width="300" height="300" fill="url(#g)"/><rect width="300" height="300" fill="url(#p)"/>
-<g transform="translate(150 128) scale(1.6)" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" opacity=".85">${MOTIFS[motif] || MOTIFS.tijera}</g>
-<text x="150" y="250" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="600" fill="${ink}" opacity=".9">${esc(label)}</text>
-</svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
 /** Portada del perfil del barbero (panorámica). */
 export function coverArt(seed) {
   const h = hash(seed);

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarX2, Check } from 'lucide-react';
-import { Avatar, EmptyState, TopBar } from '../../components/ui';
+import { Avatar, EmptyState, LoadError, Loading, TopBar } from '../../components/ui';
+import { getBarber, getBooking, getBusy, reschedule } from '../../lib/api';
 import { addDays, DAY_SHORT, formatDateLong, formatTime, fromISODate, today } from '../../lib/dates';
 import { duration, money } from '../../lib/format';
-import { getAvailableSlots, isOpenOn } from '../../lib/slots';
-import { getBarber, useStore } from '../../store/AppStore';
+import { effectiveStatus, getAvailableSlots, isOpenOn } from '../../lib/slots';
+import { useAsync, useStore } from '../../store/AppStore';
 
 const DAYS_AHEAD = 21;
 const MONTHS = [
@@ -26,29 +27,54 @@ const MONTHS = [
 /**
  * Reservar (o reprogramar) una cita: servicio → fecha → hora.
  * Con ?reprogramar=<idCita> el servicio queda fijo y no se cobra de nuevo.
+ * El servidor vuelve a validar horario y disponibilidad al guardar.
  */
 export default function Booking() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const nav = useNavigate();
-  const { state, actions } = useStore();
-  const barber = getBarber(state, id);
-  const rescheduling = state.bookings.find((b) => b.id === params.get('reprogramar'));
-
-  const [serviceId, setServiceId] = useState(rescheduling?.serviceId || params.get('servicio') || barber?.services[0]?.id);
+  const { userId } = useStore();
+  const rescheduleId = params.get('reprogramar');
   const days = useMemo(() => Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(today(), i)), []);
-  // Fecha inicial: el primer día con turnos libres para el servicio elegido
-  const [date, setDate] = useState(() => {
-    const svc = barber?.services.find((s) => s.id === serviceId) || rescheduling;
-    if (!barber || !svc) return days[0];
-    const free = (d) =>
-      getAvailableSlots({ barber, date: d, duration: svc.duration, bookings: state.bookings, excludeBookingId: rescheduling?.id })
-        .length;
-    return days.find(free) || days.find((d) => isOpenOn(barber, d)) || days[0];
-  });
-  const [time, setTime] = useState(null);
 
-  if (!barber) return <Navigate to="/cliente" replace />;
+  const res = useAsync(async () => {
+    const found = rescheduleId ? await getBooking(rescheduleId) : null;
+    // Solo se reprograma una cita propia, confirmada, futura y del barbero de la URL
+    const bad =
+      rescheduleId &&
+      (!found ||
+        found.clientId !== userId ||
+        effectiveStatus(found) !== 'confirmada' ||
+        new Date(found.startsAt) <= new Date() ||
+        found.barberId !== id);
+    if (bad) return { bad: true };
+    // Disponibilidad siempre con el barbero real de la cita al reprogramar
+    const barberId = found ? found.barberId : id;
+    const [barber, busy] = await Promise.all([getBarber(barberId), getBusy(barberId, days[0], days[days.length - 1])]);
+    return { barber, busy, rescheduling: found };
+  }, [id, rescheduleId, userId]);
+
+  if (res.data?.bad || (res.data && !res.data.barber)) return <Navigate to="/cliente" replace />;
+  if (!res.data) {
+    return (
+      <div>
+        <TopBar back title={rescheduleId ? 'Reprogramar cita' : 'Reservar cita'} />
+        {res.error ? <LoadError error={res.error} onRetry={res.reload} /> : <Loading />}
+      </div>
+    );
+  }
+  return <BookingForm {...res.data} days={days} reloadBusy={res.reload} />;
+}
+
+function BookingForm({ barber, busy, rescheduling, days, reloadBusy }) {
+  const [params] = useSearchParams();
+  const nav = useNavigate();
+  const { toast } = useStore();
+  const [saving, setSaving] = useState(false);
+  const [serviceId, setServiceId] = useState(rescheduling?.serviceId || params.get('servicio') || barber.services[0]?.id);
+  // La propia cita no cuenta como ocupada al reprogramarla
+  const taken = rescheduling ? busy.filter((b) => b.startsAt !== rescheduling.startsAt) : busy;
+  const slotsFor = (d, svc) => (svc ? getAvailableSlots({ barber, date: d, duration: svc.duration, bookings: taken }) : []);
+
   const service =
     barber.services.find((s) => s.id === serviceId) ||
     (rescheduling && {
@@ -57,24 +83,33 @@ export default function Booking() {
       duration: rescheduling.duration,
       price: rescheduling.price,
     });
+  // Fecha inicial: el primer día con turnos libres para el servicio elegido
+  const [date, setDate] = useState(
+    () => days.find((d) => slotsFor(d, service).length) || days.find((d) => isOpenOn(barber, d)) || days[0],
+  );
+  const [time, setTime] = useState(null);
+  const slots = slotsFor(date, service);
 
-  const slots = service
-    ? getAvailableSlots({
-        barber,
-        date,
-        duration: service.duration,
-        bookings: state.bookings,
-        excludeBookingId: rescheduling?.id,
-      })
-    : [];
-
-  const confirm = () => {
-    if (rescheduling) {
-      actions.rescheduleBooking(rescheduling.id, date, time);
-      actions.toast('Cita reprogramada');
-      nav('/cliente/citas', { replace: true });
-    } else {
+  const confirm = async () => {
+    if (!rescheduling) {
       nav('/cliente/pago', { state: { barberId: barber.id, serviceId: service.id, date, time } });
+      return;
+    }
+    setSaving(true);
+    try {
+      // Igual que en Checkout: confirma que el turno sigue libre antes de guardar
+      const fresh = (await getBusy(barber.id, date, date)).filter((b) => b.startsAt !== rescheduling.startsAt);
+      if (!getAvailableSlots({ barber, date, duration: service.duration, bookings: fresh }).includes(time)) {
+        throw new Error('Ese turno ya no está disponible. Elige otro.');
+      }
+      await reschedule(rescheduling.id, date, time);
+      toast('Cita reprogramada');
+      nav('/cliente/citas', { replace: true });
+    } catch (e) {
+      setSaving(false);
+      setTime(null);
+      toast(e.message, 'warn');
+      reloadBusy();
     }
   };
 
@@ -100,7 +135,8 @@ export default function Booking() {
           <div className="card p-4">
             <p className="font-medium">{service.name}</p>
             <p className="text-sm text-muted">
-              {duration(service.duration)} · {money(service.price)} (ya pagado)
+              {duration(service.duration)} · {money(service.price)}
+              {rescheduling.paymentStatus === 'pagado' ? ' · ya pagado' : ''}
             </p>
           </div>
         ) : (
@@ -201,7 +237,7 @@ export default function Booking() {
               <p className="text-xs text-muted">{service && duration(service.duration)}</p>
             </div>
           )}
-          <button disabled={!time || !service} onClick={confirm} className="btn-primary flex-1">
+          <button disabled={!time || !service || saving} onClick={confirm} className="btn-primary flex-1">
             {rescheduling ? 'Confirmar nuevo horario' : 'Continuar al pago'}
           </button>
         </div>

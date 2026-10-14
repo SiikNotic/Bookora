@@ -1,7 +1,7 @@
 // Genera los íconos de la PWA y los recursos de marca a partir del logo original
 // (scripts/logo-source.png y scripts/wordmark-source.png) usando Chromium (Playwright).
 // Uso: npm run icons      (requiere `npm i -D playwright` o Playwright global)
-import { readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -26,6 +26,31 @@ const targets = [
   ['public/brand/mark.png', logo, LOGO_MARK, 270, 320, 1, 'transparent'],
   ['public/brand/wordmark.png', wordmark, WORDMARK, 935, 180, 1, 'transparent'],
 ];
+
+// ---- Android (Capacitor): íconos del lanzador y pantalla de arranque ----
+const res = path.join(root, 'android/app/src/main/res');
+const dirs = (await readdir(res).catch(() => [])).filter((d) => d.startsWith('mipmap-') || d.startsWith('drawable'));
+const DENSITY = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+for (const dir of dirs) {
+  const files = await readdir(path.join(res, dir));
+  for (const f of files) {
+    const out = path.join('android/app/src/main/res', dir, f);
+    if (f === 'splash.png') {
+      // Mismo tamaño que la imagen original de la plantilla
+      const buf = await readFile(path.join(root, out));
+      const w = buf.readUInt32BE(16);
+      const h = buf.readUInt32BE(20);
+      targets.push([out, logo, LOGO_MARK, w, h, 0.35, '#000']);
+      continue;
+    }
+    const d = DENSITY[dir.replace('mipmap-', '')];
+    if (!d) continue;
+    if (f === 'ic_launcher.png') targets.push([out, logo, LOGO_TILE, 48 * d, 48 * d, 1, '#000']);
+    if (f === 'ic_launcher_round.png') targets.push([out, logo, LOGO_MARK, 48 * d, 48 * d, 0.62, '#000']);
+    // Ícono adaptable: 108dp con zona segura de ~66dp
+    if (f === 'ic_launcher_foreground.png') targets.push([out, logo, LOGO_MARK, 108 * d, 108 * d, 0.5, '#000']);
+  }
+}
 
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},

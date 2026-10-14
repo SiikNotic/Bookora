@@ -1,7 +1,7 @@
 // Componentes de interfaz reutilizables.
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Info, Star, TriangleAlert, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Info, Loader2, Star, TriangleAlert, WifiOff, X } from 'lucide-react';
 import { avatarArt } from '../lib/art';
 import { useStore } from '../store/AppStore';
 
@@ -37,6 +37,19 @@ export function TopBar({ title, back, right, transparent = false }) {
   );
 }
 
+// Clases fijas por tamaño (sin estilos en línea, para que la CSP no los bloquee)
+const AVATAR_SIZES = {
+  36: 'h-9 w-9',
+  40: 'h-10 w-10',
+  44: 'h-11 w-11',
+  48: 'h-12 w-12',
+  52: 'h-[52px] w-[52px]',
+  64: 'h-16 w-16',
+  72: 'h-[72px] w-[72px]',
+  84: 'h-[84px] w-[84px]',
+  96: 'h-24 w-24',
+};
+
 export function Avatar({ name, src, size = 48, className = '' }) {
   return (
     <img
@@ -44,8 +57,7 @@ export function Avatar({ name, src, size = 48, className = '' }) {
       alt={name}
       width={size}
       height={size}
-      style={{ width: size, height: size }}
-      className={`shrink-0 rounded-full object-cover ring-1 ring-line ${className}`}
+      className={`${AVATAR_SIZES[size] || AVATAR_SIZES[48]} shrink-0 rounded-full object-cover ring-1 ring-line ${className}`}
     />
   );
 }
@@ -98,6 +110,7 @@ const STATUS = {
   cancelada: ['Cancelada', 'bg-bad/15 text-bad'],
   pagado: ['Pagado', 'bg-ok/15 text-ok'],
   reembolsado: ['Reembolsado', 'bg-warn/15 text-warn'],
+  pendiente: ['Pago pendiente', 'bg-warn/15 text-warn'],
 };
 
 export function StatusBadge({ status }) {
@@ -105,13 +118,38 @@ export function StatusBadge({ status }) {
   return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${cls}`}>{label}</span>;
 }
 
-/** Aviso fijo de que todo es simulado. */
-export function DemoBanner({ children = 'Modo demo: no se realizará ningún cargo real.' }) {
+/** Aviso destacado (información importante para el usuario). */
+export function Notice({ children, tone = 'warn' }) {
+  const cls = tone === 'warn' ? 'border-warn/40 bg-warn/10 text-warn' : 'border-line bg-surface2 text-ink/85';
   return (
-    <div className="flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2.5 text-sm text-warn">
-      <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+    <div className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm ${cls}`}>
+      {tone === 'warn' ? <TriangleAlert size={18} className="mt-0.5 shrink-0" /> : <Info size={18} className="mt-0.5 shrink-0" />}
       <span>{children}</span>
     </div>
+  );
+}
+
+export function Loading({ text = 'Cargando…' }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted">
+      <Loader2 size={18} className="animate-spin" /> {text}
+    </div>
+  );
+}
+
+/** Error al cargar datos, con botón para reintentar. */
+export function LoadError({ error, onRetry }) {
+  return (
+    <EmptyState
+      icon={WifiOff}
+      title="No se pudo cargar"
+      text={error?.message}
+      action={
+        <button className="btn-secondary" onClick={onRetry}>
+          Reintentar
+        </button>
+      }
+    />
   );
 }
 

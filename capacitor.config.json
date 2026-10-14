@@ -2,7 +2,17 @@
   "appId": "pr.bookora.app",
   "appName": "Bookora",
   "webDir": "dist",
+  "server": {
+    "url": "https://bookora-pr.netlify.app",
+    "allowNavigation": ["checkout.stripe.com"],
+    "errorPath": "offline.html"
+  },
   "android": {
     "backgroundColor": "#000000"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["sound", "alert"]
+    }
   }
 }

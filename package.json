@@ -1,22 +1,28 @@
 {
   "name": "bookora",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Bookora — app demo para barberos en Puerto Rico (PWA para Android)",
+  "description": "Bookora — app para reservar con barberos en Puerto Rico (Android y web)",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "test": "node tests/dates.test.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/push-notifications": "^8.1.3",
+    "@supabase/supabase-js": "^2.117.3",
     "lucide-react": "^0.555.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",

@@ -5,16 +5,16 @@ import { useStore } from '../store/AppStore';
 
 /** Lista los errores guardados en el teléfono para poder reportarlos. */
 export default function DiagnosticsCard() {
-  const { actions } = useStore();
+  const { toast } = useStore();
   const [entries, setEntries] = useState(readDiagnostics);
 
   const text = entries.map((e) => `[${e.at}] ${e.screen}\n${e.message}`).join('\n\n');
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(`${navigator.userAgent}\n\n${text}`);
-      actions.toast('Registro copiado');
+      toast('Registro copiado');
     } catch {
-      actions.toast('No se pudo copiar; haz una captura de pantalla', 'warn');
+      toast('No se pudo copiar; haz una captura de pantalla', 'warn');
     }
   };
 

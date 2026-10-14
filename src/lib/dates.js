@@ -1,5 +1,27 @@
-// Utilidades de fecha. Las fechas se guardan como 'YYYY-MM-DD' y las horas como 'HH:MM'
-// en hora local del dispositivo (Puerto Rico = AST, sin cambio de horario).
+// Utilidades de fecha. En la app las fechas van como 'YYYY-MM-DD' y las horas como
+// 'HH:MM' en hora de Puerto Rico (AST, UTC-4 todo el año, sin cambio de horario),
+// sin importar la zona horaria del teléfono. En la base de datos van como timestamptz.
+
+export const PR_TZ = 'America/Puerto_Rico';
+const PR_OFFSET = '-04:00';
+const prParts = new Intl.DateTimeFormat('en-CA', {
+  timeZone: PR_TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Instante (Date o ISO) -> { date: 'YYYY-MM-DD', time: 'HH:MM' } en hora de PR */
+export function toPR(instant) {
+  const p = Object.fromEntries(prParts.formatToParts(new Date(instant)).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+}
+
+/** 'YYYY-MM-DD' + 'HH:MM' (hora de PR) -> ISO con zona, para la base de datos */
+export const toTimestamp = (iso, hhmm) => `${iso}T${hhmm}:00${PR_OFFSET}`;
 
 export const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 export const DAY_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -22,7 +44,7 @@ export function addDays(iso, n) {
   return toISODate(d);
 }
 
-export const today = () => toISODate(new Date());
+export const today = () => toPR(new Date()).date;
 
 export function weekday(iso) {
   return fromISODate(iso).getDay();
@@ -67,13 +89,8 @@ export function formatDateLong(iso) {
   });
 }
 
-/** Fecha+hora de una cita como objeto Date local. */
-export function toDateTime(iso, hhmm) {
-  const d = fromISODate(iso);
-  const min = toMinutes(hhmm);
-  d.setHours(Math.floor(min / 60), min % 60, 0, 0);
-  return d;
-}
+/** Fecha+hora (hora de PR) como instante Date. */
+export const toDateTime = (iso, hhmm) => new Date(toTimestamp(iso, hhmm));
 
 export function timeAgo(iso) {
   const days = Math.round((fromISODate(today()) - fromISODate(iso)) / 86400000);

@@ -1,32 +1,46 @@
 import { useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Clock, Heart, MapPin, Phone, X } from 'lucide-react';
-import { Avatar, Segmented, Stars, TopBar } from '../../components/ui';
+import { Avatar, LoadError, Loading, Segmented, Stars, TopBar } from '../../components/ui';
+import { getBarber, listReviews } from '../../lib/api';
 import { coverArt } from '../../lib/art';
 import { DAY_NAMES, formatTime, timeAgo, today, weekday } from '../../lib/dates';
 import { duration, money } from '../../lib/format';
-import { effectiveStatus } from '../../lib/slots';
-import { getBarber, ratingFor, useStore } from '../../store/AppStore';
+import { useFavorites } from '../../lib/favorites';
+import { useAsync } from '../../store/AppStore';
 
 export default function BarberProfile() {
   const { id } = useParams();
-  const { state, actions } = useStore();
   const [tab, setTab] = useState('servicios');
   const [photo, setPhoto] = useState(null);
-  const barber = getBarber(state, id);
-  if (!barber) return <Navigate to="/cliente" replace />;
+  const [favorites, toggleFavorite] = useFavorites();
+  const res = useAsync(() => Promise.all([getBarber(id), listReviews(id)]), [id]);
+  if (!res.data) {
+    return (
+      <div>
+        <TopBar back title="" />
+        {res.error ? <LoadError error={res.error} onRetry={res.reload} /> : <Loading />}
+      </div>
+    );
+  }
+  const [barber, reviews] = res.data;
+  if (!barber) {
+    return (
+      <div>
+        <TopBar back title="" />
+        <p className="px-4 py-16 text-center text-muted">Este barbero ya no está disponible.</p>
+      </div>
+    );
+  }
 
-  const rating = ratingFor(state.reviews, id);
-  const clients = new Set(
-    state.bookings.filter((b) => b.barberId === id && effectiveStatus(b) === 'completada').map((b) => b.clientName),
-  ).size;
-  const fav = state.favorites.includes(id);
+  const rating = { ...barber.rating, list: reviews };
+  const fav = favorites.includes(id);
   const openNow = barber.schedule[weekday(today())]?.open;
 
   return (
     <div className="pb-28">
       <div className="relative h-64">
-        <img src={barber.cover || coverArt(barber.id)} alt="" className="h-full w-full object-cover" />
+        <img src={barber.portfolio[0]?.src || coverArt(barber.id)} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/20 to-black/30" />
         <TopBar
           back
@@ -34,7 +48,7 @@ export default function BarberProfile() {
           right={
             <button
               aria-label="Favorito"
-              onClick={() => actions.toggleFavorite(id)}
+              onClick={() => toggleFavorite(id)}
               className="grid h-10 w-10 place-items-center rounded-full bg-black/40"
             >
               <Heart size={20} className={fav ? 'fill-accent text-accent' : ''} />
@@ -70,7 +84,7 @@ export default function BarberProfile() {
         </p>
 
         <div className="card mt-4 grid grid-cols-3 divide-x divide-line/70 py-3 text-center">
-          <Stat label="Clientes" value={clients} />
+          <Stat label="Servicios" value={barber.services.length} />
           <Stat label="Experiencia" value={`${barber.years} años`} />
           <Stat label="Reseñas" value={rating.count} />
         </div>

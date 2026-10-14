@@ -1,39 +1,63 @@
-import { Link, Navigate, useParams } from 'react-router-dom';
-import { CalendarCheck2 } from 'lucide-react';
-import { DemoBanner } from '../../components/ui';
+import { Link, useParams } from 'react-router-dom';
+import { CalendarCheck2, Clock3 } from 'lucide-react';
+import { LoadError, Loading, Notice } from '../../components/ui';
+import { getBooking } from '../../lib/api';
 import { formatDateLong, formatTime } from '../../lib/dates';
 import { money } from '../../lib/format';
-import { getBarber, useStore } from '../../store/AppStore';
+import { useAsync } from '../../store/AppStore';
 
 export default function BookingSuccess() {
   const { bookingId } = useParams();
-  const { state } = useStore();
-  const booking = state.bookings.find((b) => b.id === bookingId);
-  if (!booking) return <Navigate to="/cliente/citas" replace />;
-  const barber = getBarber(state, booking.barberId);
-  const payment = state.payments.find((p) => p.id === booking.paymentId);
+  const res = useAsync(() => getBooking(bookingId), [bookingId]);
+  if (!res.data)
+    return res.error || res.data === null ? (
+      <LoadError error={res.error || { message: 'Cita no encontrada' }} onRetry={res.reload} />
+    ) : (
+      <Loading />
+    );
+
+  const b = res.data;
+  const waitingPayment = b.paymentMethod === 'stripe' && b.paymentStatus === 'pendiente';
 
   return (
     <div className="pt-safe pb-safe flex min-h-screen flex-col px-6">
       <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <div className="grid h-24 w-24 place-items-center rounded-full bg-ok/15 text-ok">
-          <CalendarCheck2 size={44} />
+        <div
+          className={`grid h-24 w-24 place-items-center rounded-full ${waitingPayment ? 'bg-warn/15 text-warn' : 'bg-ok/15 text-ok'}`}
+        >
+          {waitingPayment ? <Clock3 size={44} /> : <CalendarCheck2 size={44} />}
         </div>
-        <h1 className="mt-6 text-2xl font-semibold">¡Cita confirmada!</h1>
+        <h1 className="mt-6 text-2xl font-semibold">{waitingPayment ? 'Esperando tu pago' : '¡Cita confirmada!'}</h1>
         <p className="mt-2 text-muted">
-          {barber.name} te espera el <span className="text-ink first-letter:lowercase">{formatDateLong(booking.date)}</span> a las{' '}
-          <span className="text-ink">{formatTime(booking.time)}</span>.
+          {b.barber?.name} te espera el <span className="text-ink first-letter:lowercase">{formatDateLong(b.date)}</span> a las{' '}
+          <span className="text-ink">{formatTime(b.time)}</span>.
         </p>
 
         <div className="card mt-8 w-full space-y-2 p-4 text-left text-sm">
-          <Row k="Servicio" v={booking.serviceName} />
-          <Row k="Lugar" v={`${barber.shop}, ${barber.municipio}`} />
-          <Row k="Pagado" v={`${money(booking.price + booking.tip)} · ${payment?.method}`} />
-          <Row k="Confirmación" v={<span className="font-mono">#{booking.id.slice(-6).toUpperCase()}</span>} />
+          <Row k="Servicio" v={b.serviceName} />
+          <Row k="Lugar" v={`${b.barber?.shop || ''}${b.barber?.municipio ? `, ${b.barber.municipio}` : ''}`} />
+          <Row
+            k="Total"
+            v={`${money(b.price + b.tip)} · ${
+              b.paymentMethod === 'barberia'
+                ? 'se paga en la barbería'
+                : b.paymentStatus === 'pagado'
+                  ? 'pagado en línea'
+                  : 'pago pendiente'
+            }`}
+          />
+          <Row k="Confirmación" v={<span className="font-mono">#{b.id.slice(0, 8).toUpperCase()}</span>} />
         </div>
-        <div className="mt-4 w-full">
-          <DemoBanner>Pago simulado: no se hizo ningún cargo.</DemoBanner>
-        </div>
+        {waitingPayment && (
+          <div className="mt-4 w-full">
+            <Notice>
+              Si ya pagaste, puede tardar unos segundos en reflejarse. Si no completas el pago en 30 minutos, el turno se libera.
+            </Notice>
+            <button className="btn-secondary mt-3 w-full" onClick={res.reload}>
+              Actualizar
+            </button>
+          </div>
+        )}
       </div>
       <div className="space-y-3 pb-8">
         <Link to="/cliente/citas" className="btn-primary w-full">
