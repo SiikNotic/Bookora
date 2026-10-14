@@ -1,143 +1,121 @@
-# Bookora — app para barberos en Puerto Rico (demo)
+# Bookora — barberos de Puerto Rico
 
-Una sola app donde los **clientes** buscan barberos, ven sus trabajos, agendan, pagan y dejan reseñas,
-y los **barberos** gestionan su agenda, fotos, servicios, cobros y calificaciones.
+App para Android (APK) y web donde los **clientes** buscan barberos en Puerto Rico, reservan, pagan y dejan
+reseñas, y los **barberos** gestionan su agenda, servicios, fotos, cobros y calificaciones.
 
-> **Esta versión es una DEMO.** No hay backend, ni base de datos, ni servidores. Todo funciona con datos
-> ficticios guardados solo en el teléfono (`localStorage`). Los pagos son **simulados**: no se cobra nada.
+- **Frontend:** React 18 + Vite + Tailwind, en español. Rutas con `HashRouter` para que funcione igual en la web
+  (Netlify) y dentro del APK (Capacitor).
+- **Backend:** [Supabase](https://supabase.com) — Auth (email y contraseña), Postgres con RLS, Storage para
+  fotos y Edge Functions para los pagos con Stripe.
+- **Pagos:** el cliente elige **pagar en la barbería** (el barbero lo marca como cobrado) o **en línea con
+  Stripe Checkout** (la tarjeta se introduce en la página de Stripe; la app nunca la ve).
 
-## Stack
-
-**React 18 + Vite + Tailwind CSS**, empaquetada como **PWA** (instalable en Android, pantalla completa,
-funciona sin conexión) y lista para convertirse en **APK con Capacitor**. Usa `HashRouter` y rutas
-relativas para que funcione igual en la web, instalada como PWA o dentro de un APK.
-
-## Estructura del proyecto
+## Estructura
 
 ```
-Bookora/
-├── index.html                 # HTML base (meta de tema, manifest, íconos)
-├── capacitor.config.json      # Config para empaquetar como APK (opcional)
-├── public/
-│   ├── manifest.webmanifest   # Manifest PWA (nombre, colores, pantalla completa)
-│   ├── sw.js                  # Service worker: caché para uso sin conexión
-│   ├── icons/                 # Íconos de la app (normal y "maskable" para Android)
-│   └── brand/                 # Logo (B) y wordmark "Bookora"
-├── scripts/
-│   ├── generate-icons.mjs     # Regenera íconos/marca desde el logo original
-│   ├── logo-source.png        # Logo original
-│   └── wordmark-source.png    # Wordmark original
-└── src/
-    ├── main.jsx               # Arranque + registro del service worker
-    ├── App.jsx                # Rutas (cliente / barbero)
-    ├── index.css              # Tema oscuro negro/plateado (tokens de color)
-    ├── data/demoData.js       # Barberos ficticios de PR, servicios, citas, pagos y reseñas
-    ├── store/AppStore.jsx     # Estado global (useReducer) + guardado local
-    ├── lib/                   # Fechas, disponibilidad de turnos, formato, imágenes
-    ├── components/            # UI reutilizable (barras, hojas inferiores, estrellas…)
-    └── pages/
-        ├── Welcome.jsx        # Elegir rol: cliente o barbero
-        ├── client/            # Explorar, Perfil del barbero, Reservar, Pago, Mis citas, Reseña, Perfil
-        └── barber/            # Panel, Agenda + horario, Servicios, Fotos, Pagos, Reseñas, Mi perfil
+src/
+  lib/api.js           # Todo el acceso a Supabase (las pantallas no hablan con la BD directamente)
+  lib/supabase.js      # Cliente de Supabase + manejo de los enlaces de los emails (confirmar / recuperar)
+  lib/dates.js         # Fechas y horas siempre en hora de Puerto Rico (AST, UTC-4)
+  lib/slots.js         # Cálculo de turnos libres (el servidor vuelve a validar al reservar)
+  store/AppStore.jsx   # Sesión, perfil, avisos y useAsync() para cargar datos
+  pages/               # Entrada/registro, cliente (client/) y barbero (barber/)
+supabase/
+  migrations/          # Esquema, RLS, funciones de reserva, Storage y tarea programada
+  functions/           # stripe-checkout, stripe-webhook, stripe-refund
+android/               # Proyecto nativo de Capacitor
+.github/workflows/     # Compila el APK en cada push
 ```
 
-## Funciones incluidas
+### Reglas que aplica el servidor (no solo la app)
 
-**Cliente**
-- Explorar barberos con foto, nombre, rating y municipio; búsqueda, filtro por municipio,
-  "Disponible hoy", favoritos y orden por rating/precio.
-- Perfil del barbero: portafolio (con visor), servicios y precios, horario y reseñas.
-- Reservar: servicio → fecha → hora, solo entre turnos realmente libres (respeta horario,
-  pausa de almuerzo y citas existentes).
-- Pago simulado con tarjeta o **ATH Móvil**, propina opcional y aviso de **modo demo** visible.
-- Mis citas: próximas, completadas y canceladas; **reprogramar** y **cancelar** (con reembolso simulado)
-  hasta 2 h antes.
-- Reseñas de 1 a 5 estrellas + comentario después de la cita.
+- Solo se reserva dentro del horario del barbero (hora de PR), con 30 min de anticipación y hasta 90 días.
+- Un barbero no puede tener dos citas que se solapen (restricción en la base de datos).
+- El cliente cancela o reprograma hasta 2 horas antes; el barbero puede cancelar siempre.
+- Las citas con pago en línea que no se pagan en ~30 min se cancelan solas y liberan el turno.
+- Cada usuario solo ve sus citas; el rol (cliente/barbero) no se puede cambiar desde la app.
+- Los barberos aparecen para los clientes cuando tienen al menos un servicio.
 
-**Barbero**
-- Panel con citas de hoy, cobrado del mes y rating promedio.
-- Agenda por día y editor de horario semanal (días abiertos, horas, pausa de almuerzo).
-- Servicios y precios: crear, editar y eliminar.
-- Portafolio: subir fotos desde galería/cámara, reordenar (la primera es la portada) y borrar.
-- Historial de pagos recibidos (simulados) con propinas y reembolsos.
-- Reseñas con promedio, distribución por estrellas y filtro.
-- Editar perfil público (nombre, barbería, municipio, foto, bio…).
+## Correr en local
 
-En **Perfil** (cliente) o **Mi perfil** (barbero) puedes cambiar de rol o **reiniciar la demo**.
-
-## Correrla en local
-
-Requisitos: **Node.js 18+**.
+Requisitos: Node 20+.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173 (también se muestra la IP de tu red)
+npm run dev      # http://localhost:5173
+npm test         # pruebas de fechas en hora de PR
+npm run build
 ```
 
-Versión de producción (con service worker activo):
+La configuración pública está en `.env` (URL del proyecto y clave *publishable* de Supabase, pensada para ir en
+la app; los datos los protege RLS). **Nunca** pongas claves secretas en `.env`.
+
+## Configuración pendiente en los paneles (una sola vez)
+
+### Supabase → Authentication → URL Configuration
+
+- **Site URL:** `https://bookora-pr.netlify.app`
+- **Redirect URLs:** agrega `https://bookora-pr.netlify.app/**`
+
+Sin esto, los enlaces de "confirmar cuenta" y "recuperar contraseña" de los emails no llevan a la app.
+
+### Emails (recomendado antes de lanzar)
+
+El servidor de email incluido en Supabase solo permite unos pocos emails por hora. Para usuarios reales
+configura un SMTP propio en **Authentication → Emails → SMTP Settings** (por ejemplo Resend, SendGrid o
+Amazon SES).
+
+### Stripe (pago en línea)
+
+1. En Stripe → **Developers → API keys**, copia la clave secreta (`sk_live_...`, o `sk_test_...` para pruebas).
+2. En Stripe → **Developers → Webhooks → Add endpoint**:
+   - URL: `https://hvxvodqnbjwslwizlwob.supabase.co/functions/v1/stripe-webhook`
+   - Eventos: `checkout.session.completed` y `checkout.session.expired`
+   - Copia el **Signing secret** (`whsec_...`).
+3. En Supabase → **Edge Functions → Secrets**, crea `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET` con esos valores.
+
+Mientras no estén, la opción "En línea" responde que el pago en línea aún no está activado y el cliente
+puede elegir pagar en la barbería. Con Stripe, el dinero entra a **tu** cuenta de Stripe; el pago a cada barbero
+se hace por fuera de la app (Stripe Connect sería el siguiente paso si quieres pagos automáticos a barberos).
+
+## APK de Android
+
+Cada push a `main` o a la rama de trabajo ejecuta **GitHub → Actions → APK Android**, que compila la app y deja el
+APK en **Artifacts → bookora-apk** de esa ejecución.
+
+**Instalar en el teléfono:** descarga el zip del artifact, sácale el `.apk`, ábrelo en Android y permite
+"instalar apps de origen desconocido" cuando lo pida. Cada compilación tiene un número de versión mayor, así que
+se instala encima de la anterior **si está firmada con la misma clave** (ver abajo).
+
+### Firma de producción (necesaria para actualizar sin desinstalar y para Google Play)
+
+Sin secretos, el workflow genera un APK de prueba (*debug*) firmado con una clave temporal: sirve para probar,
+pero cada compilación puede requerir desinstalar la anterior. Para un APK firmado (*release*):
 
 ```bash
-npm run build
-npm run preview    # http://localhost:4173
+keytool -genkey -v -keystore bookora.keystore -alias bookora -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 bookora.keystore   # copia el resultado
 ```
 
-### Probarla en tu Android desde la computadora
+En GitHub → **Settings → Secrets and variables → Actions** crea:
+`ANDROID_KEYSTORE_BASE64` (el texto base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`bookora`) y
+`ANDROID_KEY_PASSWORD`. **Guarda el `.keystore` y las contraseñas en un lugar seguro:** sin ellos no podrás
+publicar actualizaciones de la app.
 
-1. Teléfono y computadora en la **misma red Wi-Fi**.
-2. Corre `npm run dev` y abre en Chrome del teléfono la dirección `Network:` que muestra la terminal
-   (ej. `http://192.168.1.20:5173`).
+### Compilar el APK en tu computadora (opcional)
 
-> Para **instalarla** como app, Chrome exige **HTTPS** (o `localhost`). Usa una de las opciones de abajo.
+Con Android Studio instalado: `npm run build && npx cap sync android && npx cap open android`, y en Android Studio
+**Build → Build APK(s)**.
 
-## Instalarla como PWA en Android
+## Íconos
 
-1. Publica la carpeta `dist/` en cualquier hosting estático con HTTPS (Netlify, Vercel, GitHub Pages,
-   Cloudflare Pages…). Ejemplo rápido: `npm run build` y arrastra `dist/` a <https://app.netlify.com/drop>.
-   - Alternativa sin publicar: `npm run build && npm run preview` y, con el teléfono conectado por USB y
-     depuración activada, en Chrome de la computadora ve a `chrome://inspect` → *Port forwarding* `4173 → localhost:4173`,
-     y abre `http://localhost:4173` en el teléfono.
-2. Abre la URL en **Chrome para Android**.
-3. Toca el menú **⋮** → **Instalar app** (o **Agregar a la pantalla principal**).
-4. Bookora aparece con su ícono, abre a **pantalla completa** con tema oscuro y funciona sin conexión.
+`npm i -D playwright && npm run icons` regenera los íconos de la web y de Android desde
+`scripts/logo-source.png` y `scripts/wordmark-source.png`.
 
-## (Opcional) Generar un APK con Capacitor
+## Pendiente / siguientes pasos
 
-La configuración ya está en `capacitor.config.json` (`appId: pr.bookora.app`, `webDir: dist`).
-Requiere **Android Studio**.
-
-```bash
-npm i @capacitor/core @capacitor/android
-npm i -D @capacitor/cli
-npm run build
-npx cap add android
-npx cap sync android
-npx cap open android      # En Android Studio: Build → Build APK(s)
-```
-
-Tras cada cambio: `npm run build && npx cap sync android`.
-
-## Personalizar
-
-- **Colores:** `src/index.css` → variables `--accent`, `--bg`, etc. (p. ej. dorado: `--accent: 201 164 104;`).
-- **Barberos y datos de ejemplo:** `src/data/demoData.js`.
-- **Íconos y logo:** reemplaza `scripts/logo-source.png` / `scripts/wordmark-source.png` y corre
-  `npm i -D playwright && npm run icons`.
-- Si cambias `public/sw.js`, sube la versión `CACHE` para forzar la actualización en los teléfonos.
-
-## Qué faltaría para una versión real
-
-1. **Backend y base de datos** (p. ej. Supabase/Firebase o API propia con PostgreSQL) para barberos,
-   servicios, horarios, citas, pagos y reseñas compartidos entre usuarios.
-2. **Cuentas y autenticación** (teléfono/SMS, Google, email) con roles cliente/barbero y verificación
-   de barberos.
-3. **Reservas sin choques en el servidor**: bloqueo transaccional del turno, zona horaria AST,
-   días libres/feriados, políticas de cancelación y de no-show.
-4. **Pagos reales**: Stripe Connect (o similar) para cobrar y pagar a cada barbero, **ATH Business/ATH
-   Móvil**, reembolsos, comisiones de la plataforma, recibos y manejo del **IVU**.
-5. **Almacenamiento de fotos** en la nube (S3/Supabase Storage) con compresión y moderación.
-6. **Notificaciones**: push (FCM), SMS/WhatsApp y email para confirmaciones y recordatorios.
-7. **Reseñas verificadas** y moderación/reportes de contenido.
-8. **Mapas y ubicación** (Google Maps) para buscar por cercanía y llegar a la barbería.
-9. **Legal y cumplimiento**: términos, privacidad, manejo de datos de pago (PCI vía el proveedor).
-10. **Calidad y operación**: pruebas automatizadas, analítica, monitoreo de errores, CI/CD y
-    publicación en **Google Play** (TWA o Capacitor) con firma de la app.
+- SMTP propio para los emails de Auth (ver arriba).
+- Stripe Connect si se quiere pagar automáticamente a cada barbero.
+- Notificaciones (recordatorio de cita por push o SMS).
+- Publicación en Google Play (requiere la firma de producción y una cuenta de desarrollador).
+- Actualizar react-router a la v7 (las alertas de `npm audit` actuales no afectan a esta app).

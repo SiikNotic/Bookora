@@ -1,7 +1,7 @@
 {
   "name": "Bookora — Barberos de Puerto Rico",
   "short_name": "Bookora",
-  "description": "Busca barberos en PR, agenda, paga y deja tu reseña. (Versión demo)",
+  "description": "Busca barberos en PR, agenda, paga y deja tu reseña.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",

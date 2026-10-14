@@ -3,7 +3,7 @@
 // - Navegación: red primero, caché como respaldo.
 // - Archivos estáticos (JS/CSS/íconos): caché primero.
 // Sube CACHE cuando cambies este archivo (o el manifest) para forzar la actualización.
-const CACHE = 'bookora-v5';
+const CACHE = 'bookora-v6';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {

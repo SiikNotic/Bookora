@@ -1,9 +1,9 @@
 {
   "name": "bookora",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Bookora — app demo para barberos en Puerto Rico (PWA para Android)",
+  "description": "Bookora — app para reservar con barberos en Puerto Rico (Android y web)",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
