@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Camera, Loader2, LogOut } from 'lucide-react';
 import DiagnosticsCard from '../../components/DiagnosticsCard';
+import NotificationSettings from '../../components/NotificationSettings';
 import { Avatar, TopBar } from '../../components/ui';
 import { signOut, updateBarber, uploadAvatar } from '../../lib/api';
 import { resizeImage } from '../../lib/images';
@@ -125,6 +126,7 @@ function SettingsForm({ me, reload }) {
         <div className="card mt-8 divide-y divide-line/60">
           <MenuButton icon={LogOut} label="Cerrar sesión" onClick={() => signOut()} />
         </div>
+        <NotificationSettings />
         <DiagnosticsCard />
       </div>
     </div>

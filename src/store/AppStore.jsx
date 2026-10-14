@@ -1,6 +1,7 @@
 // Sesión (Supabase Auth), perfil del usuario y avisos (toasts).
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getProfile } from '../lib/api';
+import { setupPush } from '../lib/push';
 import { supabase } from '../lib/supabase';
 
 const StoreContext = createContext(null);
@@ -37,6 +38,11 @@ export function AppStoreProvider({ children }) {
   useEffect(() => {
     refreshProfile();
   }, [refreshProfile]);
+
+  // En el APK: registrar este teléfono para recibir avisos de la cuenta
+  useEffect(() => {
+    if (userId) setupPush().catch(() => {});
+  }, [userId]);
 
   const value = useMemo(
     () => ({

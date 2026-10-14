@@ -39,6 +39,18 @@ jobs:
       - name: Compilar la app web
         run: npm run build
 
+      # Notificaciones: con el google-services.json de Firebase se incluyen; sin él, el APK
+      # se compila sin el plugin (la app funciona igual, solo que sin avisos).
+      - name: Firebase (si está configurado)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          else
+            node -e "const f='capacitor.config.json',c=require('./'+f);c.android.includePlugins=[];require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+          fi
+
       - name: Copiar la app al proyecto Android
         run: npx cap sync android
 

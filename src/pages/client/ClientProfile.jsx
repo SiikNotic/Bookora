@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Heart, LogOut } from 'lucide-react';
 import DiagnosticsCard from '../../components/DiagnosticsCard';
+import NotificationSettings from '../../components/NotificationSettings';
 import { Avatar, TopBar } from '../../components/ui';
 import { listBarbers, signOut, updateProfile } from '../../lib/api';
 import { useFavorites } from '../../lib/favorites';
@@ -91,6 +92,7 @@ export default function ClientProfile() {
         <div className="card mt-7 divide-y divide-line/60">
           <MenuButton icon={LogOut} label="Cerrar sesión" onClick={() => signOut()} />
         </div>
+        <NotificationSettings />
         <DiagnosticsCard />
         <p className="py-8 text-center text-xs text-muted">Bookora · versión {import.meta.env.VITE_APP_VERSION || '1.0'}</p>
       </div>
