@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarX2, Check } from 'lucide-react';
 import { Avatar, EmptyState, TopBar } from '../../components/ui';
-import { addDays, DAY_SHORT, formatDateLong, formatTime, fromISODate, today } from '../../lib/dates';
+import { addDays, DAY_SHORT, formatDateLong, formatTime, fromISODate, toDateTime, today } from '../../lib/dates';
 import { duration, money } from '../../lib/format';
-import { getAvailableSlots, isOpenOn } from '../../lib/slots';
+import { effectiveStatus, getAvailableSlots, isOpenOn } from '../../lib/slots';
 import { getBarber, useStore } from '../../store/AppStore';
 
 const DAYS_AHEAD = 21;
@@ -32,8 +32,19 @@ export default function Booking() {
   const [params] = useSearchParams();
   const nav = useNavigate();
   const { state, actions } = useStore();
-  const barber = getBarber(state, id);
-  const rescheduling = state.bookings.find((b) => b.id === params.get('reprogramar'));
+  const rescheduleId = params.get('reprogramar');
+  const found = rescheduleId ? state.bookings.find((b) => b.id === rescheduleId) : null;
+  // Solo se reprograma una cita propia, confirmada, futura y del barbero de la URL
+  const badReschedule =
+    rescheduleId &&
+    (!found ||
+      !found.isMe ||
+      effectiveStatus(found) !== 'confirmada' ||
+      toDateTime(found.date, found.time) <= new Date() ||
+      found.barberId !== id);
+  const rescheduling = badReschedule ? null : found;
+  // Disponibilidad siempre con el barbero real de la cita al reprogramar
+  const barber = getBarber(state, rescheduling ? rescheduling.barberId : id);
 
   const [serviceId, setServiceId] = useState(rescheduling?.serviceId || params.get('servicio') || barber?.services[0]?.id);
   const days = useMemo(() => Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(today(), i)), []);
@@ -48,7 +59,7 @@ export default function Booking() {
   });
   const [time, setTime] = useState(null);
 
-  if (!barber) return <Navigate to="/cliente" replace />;
+  if (!barber || badReschedule) return <Navigate to="/cliente" replace />;
   const service =
     barber.services.find((s) => s.id === serviceId) ||
     (rescheduling && {
