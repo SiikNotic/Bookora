@@ -20,7 +20,8 @@ consumeAuthRedirect().finally(() =>
 );
 
 // Service worker solo en producción (en desarrollo estorba con la caché).
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// En el APK (Capacitor) los archivos ya van dentro de la app: no hace falta.
+if ('serviceWorker' in navigator && import.meta.env.PROD && !window.Capacitor?.isNativePlatform?.()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
