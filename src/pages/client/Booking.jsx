@@ -81,6 +81,19 @@ export default function Booking() {
 
   const confirm = () => {
     if (rescheduling) {
+      // Igual que en Checkout: confirma que el turno sigue libre antes de guardar
+      const stillFree = getAvailableSlots({
+        barber,
+        date,
+        duration: service.duration,
+        bookings: state.bookings,
+        excludeBookingId: rescheduling.id,
+      }).includes(time);
+      if (!stillFree) {
+        setTime(null);
+        actions.toast('Ese turno ya no está disponible. Elige otro.', 'warn');
+        return;
+      }
       actions.rescheduleBooking(rescheduling.id, date, time);
       actions.toast('Cita reprogramada');
       nav('/cliente/citas', { replace: true });
