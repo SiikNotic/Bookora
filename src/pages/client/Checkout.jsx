@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { CreditCard, Loader2, Lock, Smartphone } from 'lucide-react';
 import { Avatar, DemoBanner, TopBar } from '../../components/ui';
 import { formatDateLong, formatTime } from '../../lib/dates';
-import { duration, money } from '../../lib/format';
+import { duration, money, validCardNumber } from '../../lib/format';
 import { getAvailableSlots } from '../../lib/slots';
 import { getBarber, useStore } from '../../store/AppStore';
 
@@ -22,6 +22,7 @@ export default function Checkout() {
   const [card, setCard] = useState({ number: '4242 4242 4242 4242', exp: '12/29', cvc: '123', name: state.clientName });
   const [athPhone, setAthPhone] = useState('(787) 555-0100');
   const [processing, setProcessing] = useState(false);
+  const [numberTouched, setNumberTouched] = useState(false);
 
   const barber = draft && getBarber(state, draft.barberId);
   const service = barber?.services.find((s) => s.id === draft.serviceId);
@@ -29,7 +30,11 @@ export default function Checkout() {
 
   const tip = Math.round(service.price * tipPct * 100) / 100;
   const total = service.price + tip;
-  const cardOk = card.number.replace(/\D/g, '').length >= 15 && /^\d{2}\/\d{2}$/.test(card.exp) && card.cvc.length >= 3;
+  const cardDigits = card.number.replace(/\D/g, '');
+  const numberOk = validCardNumber(cardDigits);
+  // Muestra el error al salir del campo o al llegar a 16 dígitos
+  const numberError = !numberOk && (numberTouched || cardDigits.length >= 16);
+  const cardOk = numberOk && /^\d{2}\/\d{2}$/.test(card.exp) && card.cvc.length >= 3;
   const canPay = method === 'ath' ? athPhone.replace(/\D/g, '').length >= 10 : cardOk;
 
   const pay = () => {
@@ -110,7 +115,7 @@ export default function Checkout() {
           <div className="space-y-3">
             <Field label="Número de tarjeta">
               <input
-                className="input font-mono"
+                className={`input font-mono ${numberError ? 'border-bad' : ''}`}
                 inputMode="numeric"
                 value={card.number}
                 onChange={(e) =>
@@ -118,12 +123,15 @@ export default function Checkout() {
                     ...card,
                     number: e.target.value
                       .replace(/\D/g, '')
-                      .slice(0, 16)
+                      .slice(0, 19)
                       .replace(/(.{4})/g, '$1 ')
                       .trim(),
                   })
                 }
+                onBlur={() => setNumberTouched(true)}
+                aria-invalid={numberError}
               />
+              {numberError && <p className="mt-1.5 text-sm text-bad">Número de tarjeta no válido. Revisa los dígitos.</p>}
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Vence (MM/AA)">
