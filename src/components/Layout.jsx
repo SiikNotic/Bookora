@@ -48,8 +48,9 @@ function BottomNav({ tabs }) {
 
 /** Contenedor de las pestañas principales: contenido + barra inferior. */
 export function TabsLayout({ role }) {
-  const { state } = useStore();
-  if (state.role !== role) return <Navigate to="/" replace />;
+  const { role: current, loading } = useStore();
+  if (loading) return null;
+  if (current !== role) return <Navigate to="/" replace />;
   return (
     <>
       <main className="pb-24">
@@ -62,7 +63,8 @@ export function TabsLayout({ role }) {
 
 /** Pantallas de detalle (sin barra inferior) protegidas por rol. */
 export function RoleGuard({ role }) {
-  const { state } = useStore();
-  if (state.role !== role) return <Navigate to="/" replace />;
+  const { role: current, loading } = useStore();
+  if (loading) return null;
+  if (current !== role) return <Navigate to="/" replace />;
   return <Outlet />;
 }

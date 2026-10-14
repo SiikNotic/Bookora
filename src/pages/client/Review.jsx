@@ -1,28 +1,44 @@
 import { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { Avatar, StarInput, TopBar } from '../../components/ui';
+import { Avatar, Loading, StarInput, TopBar } from '../../components/ui';
+import { addReview, myBookings } from '../../lib/api';
 import { formatDateShort } from '../../lib/dates';
 import { effectiveStatus } from '../../lib/slots';
-import { getBarber, useStore } from '../../store/AppStore';
+import { useAsync, useStore } from '../../store/AppStore';
+
+/** Nombre público en la reseña: "Alex Rivera" -> "Alex R." */
+const publicName = (full) => {
+  const [first = 'Cliente', ...rest] = full.trim().split(/\s+/);
+  return rest.length ? `${first} ${rest[rest.length - 1][0]}.` : first;
+};
 
 const QUICK = ['Puntual', 'Buen ambiente', 'Corte perfecto', 'Muy limpio', 'Buen precio'];
 
 export default function Review() {
   const { bookingId } = useParams();
   const nav = useNavigate();
-  const { state, actions } = useStore();
+  const { profile, toast } = useStore();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [saving, setSaving] = useState(false);
+  const res = useAsync(myBookings);
 
-  const booking = state.bookings.find((b) => b.id === bookingId && b.isMe);
-  // Solo se reseña una cita propia, completada y sin reseña previa
-  if (!booking || booking.reviewId || effectiveStatus(booking) !== 'completada') return <Navigate to="/cliente/citas" replace />;
-  const barber = getBarber(state, booking.barberId);
+  if (!res.data) return <Loading />;
+  const booking = res.data.find((b) => b.id === bookingId);
+  // Solo se reseña una cita propia, completada y sin reseña previa (el servidor también lo exige)
+  if (!booking || booking.reviewed || effectiveStatus(booking) !== 'completada') return <Navigate to="/cliente/citas" replace />;
+  const barber = booking.barber;
 
-  const submit = () => {
-    actions.addReview({ booking, rating, comment: comment.trim(), author: state.clientName });
-    actions.toast('¡Gracias por tu reseña!');
-    nav('/cliente/citas', { replace: true });
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await addReview({ booking, rating, comment: comment.trim(), author: publicName(profile?.full_name || '') });
+      toast('¡Gracias por tu reseña!');
+      nav('/cliente/citas', { replace: true });
+    } catch (e) {
+      setSaving(false);
+      toast(e.message, 'warn');
+    }
   };
 
   return (
@@ -63,10 +79,10 @@ export default function Review() {
           <span className="mt-1 block text-right text-xs text-muted">{comment.length}/400</span>
         </label>
 
-        <button disabled={!rating} onClick={submit} className="btn-primary mt-6 w-full">
+        <button disabled={!rating || saving} onClick={submit} className="btn-primary mt-6 w-full">
           Publicar reseña
         </button>
-        <p className="mt-3 text-center text-xs text-muted">La reseña se guarda solo en este dispositivo (demo).</p>
+        <p className="mt-3 text-center text-xs text-muted">Tu reseña será pública con tu nombre y la inicial de tu apellido.</p>
       </div>
     </div>
   );

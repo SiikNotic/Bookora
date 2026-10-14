@@ -1,20 +1,62 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CalendarDays, MapPin, Star } from 'lucide-react';
-import { Avatar, Confirm, EmptyState, Segmented, StatusBadge, TopBar } from '../../components/ui';
-import { formatDateShort, formatTime, toDateTime } from '../../lib/dates';
+import { Avatar, Confirm, EmptyState, LoadError, Loading, Segmented, StatusBadge, TopBar } from '../../components/ui';
+import { cancelBooking, myBookings, refundBooking, startCheckout } from '../../lib/api';
+import { formatDateShort, formatTime } from '../../lib/dates';
 import { duration, money } from '../../lib/format';
 import { effectiveStatus } from '../../lib/slots';
-import { getBarber, useStore } from '../../store/AppStore';
+import { useAsync, useStore } from '../../store/AppStore';
+
+/** Texto del estado del pago de una cita */
+function paymentLabel(b) {
+  if (b.paymentStatus === 'reembolsado') return 'Reembolsado';
+  if (b.paymentStatus === 'pagado') return b.paymentMethod === 'stripe' ? 'Pagado en línea' : 'Pagado';
+  if (b.status === 'cancelada') return 'Sin cargo';
+  return b.paymentMethod === 'stripe' ? 'Pago en línea pendiente' : 'Se paga en la barbería';
+}
 
 export default function MyBookings() {
-  const { state, actions } = useStore();
+  const { toast } = useStore();
   const nav = useNavigate();
   const [tab, setTab] = useState('proximas');
   const [toCancel, setToCancel] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const res = useAsync(myBookings);
 
-  const mine = state.bookings.filter((b) => b.isMe).map((b) => ({ ...b, effective: effectiveStatus(b) }));
-  const byTime = (a, b) => toDateTime(a.date, a.time) - toDateTime(b.date, b.time);
+  if (!res.data) {
+    return (
+      <div>
+        <TopBar title="Mis citas" />
+        {res.error ? <LoadError error={res.error} onRetry={res.reload} /> : <Loading />}
+      </div>
+    );
+  }
+
+  const mine = res.data.map((b) => ({ ...b, effective: effectiveStatus(b) }));
+  const byTime = (a, b) => new Date(a.startsAt) - new Date(b.startsAt);
+
+  const run = async (b, fn, okMsg) => {
+    setBusyId(b.id);
+    try {
+      const out = await fn();
+      if (okMsg) toast(okMsg);
+      return out;
+    } catch (e) {
+      toast(e.message, 'warn');
+    } finally {
+      setBusyId(null);
+      res.reload();
+    }
+  };
+  const payNow = (b) =>
+    run(b, async () => {
+      window.location.href = await startCheckout(b.id);
+    });
+  const doCancel = (b) =>
+    b.paymentMethod === 'stripe' && b.paymentStatus === 'pagado'
+      ? run(b, () => refundBooking(b.id), 'Cita cancelada. El reembolso llegará a tu tarjeta en 5–10 días.')
+      : run(b, () => cancelBooking(b.id), 'Cita cancelada');
   const lists = {
     proximas: mine.filter((b) => b.effective === 'confirmada').sort(byTime),
     pasadas: mine.filter((b) => b.effective === 'completada').sort((a, b) => byTime(b, a)),
@@ -38,9 +80,10 @@ export default function MyBookings() {
 
         <div className="mt-4 space-y-4">
           {list.map((b) => {
-            const barber = getBarber(state, b.barberId);
-            // Regla de la demo: se puede cancelar/reprogramar hasta 2 h antes
-            const editable = toDateTime(b.date, b.time) - Date.now() > 2 * 3600000;
+            const barber = b.barber;
+            // Se puede cancelar/reprogramar hasta 2 h antes (el servidor aplica la misma regla)
+            const editable = new Date(b.startsAt) - Date.now() > 2 * 3600000;
+            const unpaidOnline = b.effective === 'confirmada' && b.paymentMethod === 'stripe' && b.paymentStatus === 'pendiente';
             return (
               <div key={b.id} className="card p-4">
                 <div className="flex items-start gap-3">
@@ -70,13 +113,22 @@ export default function MyBookings() {
                   </div>
                   <div className="border-l border-line pl-3">
                     <p className="font-medium">{money(b.price + b.tip)}</p>
-                    <p className="text-xs text-muted">{b.effective === 'cancelada' ? 'Reembolsado (demo)' : 'Total pagado'}</p>
+                    <p className="text-xs text-muted">{paymentLabel(b)}</p>
                   </div>
                 </div>
 
+                {unpaidOnline && (
+                  <button disabled={busyId === b.id} className="btn-primary mt-3 w-full py-2.5 text-sm" onClick={() => payNow(b)}>
+                    Completar pago en línea
+                  </button>
+                )}
                 {b.effective === 'confirmada' && (
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button disabled={!editable} className="btn-secondary py-2.5 text-sm" onClick={() => setToCancel(b)}>
+                    <button
+                      disabled={!editable || busyId === b.id}
+                      className="btn-secondary py-2.5 text-sm"
+                      onClick={() => setToCancel(b)}
+                    >
                       Cancelar
                     </button>
                     <button
@@ -92,7 +144,7 @@ export default function MyBookings() {
                   </div>
                 )}
                 {b.effective === 'completada' &&
-                  (b.reviewId ? (
+                  (b.reviewed ? (
                     <p className="mt-3 flex items-center gap-1.5 text-sm text-muted">
                       <Star size={14} className="fill-accent text-accent" /> Ya dejaste tu reseña. ¡Gracias!
                     </p>
@@ -133,13 +185,14 @@ export default function MyBookings() {
         open={Boolean(toCancel)}
         onClose={() => setToCancel(null)}
         title="¿Cancelar cita?"
-        text="Se liberará el turno y el pago se reembolsará (simulado)."
+        text={
+          toCancel?.paymentStatus === 'pagado'
+            ? 'Se liberará el turno y se reembolsará el pago a tu tarjeta.'
+            : 'Se liberará el turno para otros clientes.'
+        }
         confirmLabel="Sí, cancelar"
         danger
-        onConfirm={() => {
-          actions.cancelBooking(toCancel.id);
-          actions.toast('Cita cancelada y reembolso simulado');
-        }}
+        onConfirm={() => doCancel(toCancel)}
       />
     </div>
   );

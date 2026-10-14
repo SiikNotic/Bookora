@@ -2,10 +2,7 @@ import { fromMinutes, toDateTime, toMinutes, weekday } from './dates';
 
 export const SLOT_STEP = 30; // minutos entre un turno y el siguiente
 
-/**
- * Estado "real" de una cita: una cita confirmada cuya hora de fin ya pasó
- * se considera completada (en una versión real lo marcaría el backend).
- */
+/** Una cita confirmada cuya hora de fin ya pasó se muestra como completada. */
 export function effectiveStatus(booking, now = new Date()) {
   if (booking.status !== 'confirmada') return booking.status;
   const end = toDateTime(booking.date, booking.time);
@@ -16,7 +13,7 @@ export function effectiveStatus(booking, now = new Date()) {
 /**
  * Turnos libres de un barbero para un día y una duración de servicio.
  * Excluye: días cerrados, choques con otras citas, la pausa de almuerzo
- * y horas que ya pasaron (si es hoy).
+ * y horas que ya pasaron (si es hoy). El servidor vuelve a validar todo al reservar.
  */
 export function getAvailableSlots({ barber, date, duration, bookings, excludeBookingId, now = new Date() }) {
   const day = barber.schedule[weekday(date)];

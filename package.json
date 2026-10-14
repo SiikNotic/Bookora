@@ -9,9 +9,10 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "icons": "node scripts/generate-icons.mjs",
-    "test": "node tests/format.test.mjs"
+    "test": "node tests/dates.test.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "lucide-react": "^0.555.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

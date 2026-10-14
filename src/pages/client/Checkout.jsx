@@ -1,77 +1,67 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { CreditCard, Loader2, Lock, Smartphone } from 'lucide-react';
-import { Avatar, DemoBanner, TopBar } from '../../components/ui';
+import { CreditCard, Loader2, Lock, Store } from 'lucide-react';
+import { Avatar, LoadError, Loading, Notice, TopBar } from '../../components/ui';
+import { book, cancelBooking, getBarber, startCheckout } from '../../lib/api';
 import { formatDateLong, formatTime } from '../../lib/dates';
-import { duration, money, validCardNumber } from '../../lib/format';
-import { getAvailableSlots } from '../../lib/slots';
-import { getBarber, useStore } from '../../store/AppStore';
+import { duration, money } from '../../lib/format';
+import { useAsync, useStore } from '../../store/AppStore';
 
 const TIPS = [0, 0.1, 0.15, 0.2];
 
 /**
- * Pago SIMULADO. No se conecta a Stripe ni a ATH Móvil: solo imita el flujo
- * (resumen → propina → método → "procesando" → confirmación).
+ * Confirmar y pagar. Dos opciones:
+ * - En la barbería: la cita queda confirmada y se paga al llegar.
+ * - En línea: se abre la página segura de Stripe; la tarjeta nunca pasa por la app.
  */
 export default function Checkout() {
   const { state: draft } = useLocation();
   const nav = useNavigate();
-  const { state, actions } = useStore();
+  const { toast } = useStore();
   const [tipPct, setTipPct] = useState(0.15);
-  const [method, setMethod] = useState('card');
-  const [card, setCard] = useState({ number: '4242 4242 4242 4242', exp: '12/29', cvc: '123', name: state.clientName });
-  const [athPhone, setAthPhone] = useState('(787) 555-0100');
+  const [method, setMethod] = useState('barberia');
   const [processing, setProcessing] = useState(false);
-  const [numberTouched, setNumberTouched] = useState(false);
+  const res = useAsync(() => (draft ? getBarber(draft.barberId) : null), [draft?.barberId]);
 
-  const barber = draft && getBarber(state, draft.barberId);
-  const service = barber?.services.find((s) => s.id === draft.serviceId);
-  if (!barber || !service) return <Navigate to="/cliente" replace />;
+  if (!draft) return <Navigate to="/cliente" replace />;
+  if (!res.data) {
+    return (
+      <div>
+        <TopBar back title="Confirmar cita" />
+        {res.error ? <LoadError error={res.error} onRetry={res.reload} /> : <Loading />}
+      </div>
+    );
+  }
+  const barber = res.data;
+  const service = barber.services.find((s) => s.id === draft.serviceId);
+  if (!service) return <Navigate to="/cliente" replace />;
 
   const tip = Math.round(service.price * tipPct * 100) / 100;
   const total = service.price + tip;
-  const cardDigits = card.number.replace(/\D/g, '');
-  const numberOk = validCardNumber(cardDigits);
-  // Muestra el error al salir del campo o al llegar a 16 dígitos
-  const numberError = !numberOk && (numberTouched || cardDigits.length >= 16);
-  const cardOk = numberOk && /^\d{2}\/\d{2}$/.test(card.exp) && card.cvc.length >= 3;
-  const canPay = method === 'ath' ? athPhone.replace(/\D/g, '').length >= 10 : cardOk;
 
-  const pay = () => {
+  const confirm = async () => {
     setProcessing(true);
-    // Simula la espera del procesador de pagos
-    setTimeout(() => {
-      const stillFree = getAvailableSlots({
-        barber,
-        date: draft.date,
-        duration: service.duration,
-        bookings: state.bookings,
-      }).includes(draft.time);
-      if (!stillFree) {
-        setProcessing(false);
-        actions.toast('Ese turno ya no está disponible. Elige otro.', 'warn');
-        nav(-1);
+    let booking;
+    try {
+      booking = await book({ serviceId: service.id, date: draft.date, time: draft.time, tip, method });
+      if (method === 'barberia') {
+        nav(`/cliente/confirmada/${booking.id}`, { replace: true });
         return;
       }
-      const id = actions.createBooking({
-        barber,
-        service,
-        date: draft.date,
-        time: draft.time,
-        tip,
-        method: method === 'ath' ? 'ATH Móvil' : `Tarjeta •••• ${card.number.replace(/\D/g, '').slice(-4)}`,
-        clientName: state.clientName,
-      });
-      nav(`/cliente/confirmada/${id}`, { replace: true });
-    }, 1400);
+      window.location.href = await startCheckout(booking.id);
+    } catch (e) {
+      // Si no se pudo abrir el pago en línea, se libera el turno reservado
+      if (booking && method === 'stripe') await cancelBooking(booking.id).catch(() => {});
+      setProcessing(false);
+      toast(e.message, 'warn');
+      if (/no está disponible/.test(e.message)) nav(-1);
+    }
   };
 
   return (
     <div className="pb-32">
-      <TopBar back title="Pago" />
+      <TopBar back title="Confirmar cita" />
       <div className="space-y-5 px-4 pt-4">
-        <DemoBanner>Modo demo: el pago es simulado y no se realizará ningún cargo. Puedes usar los datos de prueba.</DemoBanner>
-
         <div className="card p-4">
           <div className="flex items-center gap-3">
             <Avatar name={barber.name} src={barber.avatar} size={44} />
@@ -85,6 +75,7 @@ export default function Checkout() {
             <Row label="Fecha" value={<span className="first-letter:uppercase">{formatDateLong(draft.date)}</span>} />
             <Row label="Hora" value={formatTime(draft.time)} />
             <Row label="Duración" value={duration(service.duration)} />
+            <Row label="Lugar" value={[barber.address, barber.municipio].filter(Boolean).join(', ')} />
           </dl>
         </div>
 
@@ -104,66 +95,24 @@ export default function Checkout() {
         </div>
 
         <div>
-          <p className="label">Método de pago</p>
+          <p className="label">¿Cómo vas a pagar?</p>
           <div className="grid grid-cols-2 gap-2">
-            <MethodButton active={method === 'card'} onClick={() => setMethod('card')} icon={CreditCard} label="Tarjeta" />
-            <MethodButton active={method === 'ath'} onClick={() => setMethod('ath')} icon={Smartphone} label="ATH Móvil" />
+            <MethodButton
+              active={method === 'barberia'}
+              onClick={() => setMethod('barberia')}
+              icon={Store}
+              label="En la barbería"
+            />
+            <MethodButton active={method === 'stripe'} onClick={() => setMethod('stripe')} icon={CreditCard} label="En línea" />
           </div>
+          <p className="mt-2 text-xs text-muted">
+            {method === 'barberia'
+              ? 'Pagas al llegar, como acuerdes con tu barbero (efectivo, ATH Móvil o tarjeta).'
+              : 'Pagas ahora con tarjeta en la página segura de Stripe.'}
+          </p>
         </div>
 
-        {method === 'card' ? (
-          <div className="space-y-3">
-            <Field label="Número de tarjeta">
-              <input
-                className={`input font-mono ${numberError ? 'border-bad' : ''}`}
-                inputMode="numeric"
-                value={card.number}
-                onChange={(e) =>
-                  setCard({
-                    ...card,
-                    number: e.target.value
-                      .replace(/\D/g, '')
-                      .slice(0, 19)
-                      .replace(/(.{4})/g, '$1 ')
-                      .trim(),
-                  })
-                }
-                onBlur={() => setNumberTouched(true)}
-                aria-invalid={numberError}
-              />
-              {numberError && <p className="mt-1.5 text-sm text-bad">Número de tarjeta no válido. Revisa los dígitos.</p>}
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Vence (MM/AA)">
-                <input
-                  className="input font-mono"
-                  inputMode="numeric"
-                  value={card.exp}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/\D/g, '').slice(0, 4);
-                    setCard({ ...card, exp: v.length > 2 ? `${v.slice(0, 2)}/${v.slice(2)}` : v });
-                  }}
-                />
-              </Field>
-              <Field label="CVC">
-                <input
-                  className="input font-mono"
-                  inputMode="numeric"
-                  value={card.cvc}
-                  onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                />
-              </Field>
-            </div>
-            <Field label="Nombre en la tarjeta">
-              <input className="input" value={card.name} onChange={(e) => setCard({ ...card, name: e.target.value })} />
-            </Field>
-          </div>
-        ) : (
-          <Field label="Teléfono registrado en ATH Móvil">
-            <input className="input" inputMode="tel" value={athPhone} onChange={(e) => setAthPhone(e.target.value)} />
-            <p className="mt-2 text-xs text-muted">En la versión real recibirías la solicitud de pago en tu app de ATH Móvil.</p>
-          </Field>
-        )}
+        {method === 'stripe' && <Notice tone="info">Tienes 30 minutos para completar el pago; si no, el turno se libera.</Notice>}
 
         <div className="card space-y-2 p-4 text-sm">
           <Row label="Servicio" value={money(service.price)} />
@@ -177,14 +126,16 @@ export default function Checkout() {
       </div>
 
       <div className="pb-safe fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-line/60 bg-bg px-4 pt-3">
-        <button disabled={!canPay || processing} onClick={pay} className="btn-primary mb-3 w-full">
+        <button disabled={processing} onClick={confirm} className="btn-primary mb-3 w-full">
           {processing ? (
             <>
               <Loader2 size={18} className="animate-spin" /> Procesando…
             </>
+          ) : method === 'barberia' ? (
+            'Confirmar cita'
           ) : (
             <>
-              <Lock size={16} /> Pagar {money(total)} (demo)
+              <Lock size={16} /> Pagar {money(total)}
             </>
           )}
         </button>
@@ -199,15 +150,6 @@ function Row({ label, value }) {
       <dt className="text-muted">{label}</dt>
       <dd className="text-right">{value}</dd>
     </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="label">{label}</span>
-      {children}
-    </label>
   );
 }
 

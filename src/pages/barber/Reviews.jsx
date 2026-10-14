@@ -1,15 +1,25 @@
 import { useState } from 'react';
 import { MessageSquareText } from 'lucide-react';
-import { EmptyState, Stars, TopBar } from '../../components/ui';
-import { ratingFor, useStore } from '../../store/AppStore';
+import { EmptyState, LoadError, Loading, Stars, TopBar } from '../../components/ui';
+import { listReviews } from '../../lib/api';
+import { useAsync, useStore } from '../../store/AppStore';
 import { ReviewItem } from '../client/BarberProfile';
-import { useMyBarber } from './Dashboard';
 
 export default function Reviews() {
-  const { state } = useStore();
-  const me = useMyBarber();
+  const { userId } = useStore();
   const [stars, setStars] = useState(0); // 0 = todas
-  const { avg, count, list } = ratingFor(state.reviews, me.id);
+  const res = useAsync(() => listReviews(userId), [userId]);
+  if (!res.data) {
+    return (
+      <div>
+        <TopBar back="/barbero" title="Reseñas" />
+        {res.error ? <LoadError error={res.error} onRetry={res.reload} /> : <Loading />}
+      </div>
+    );
+  }
+  const list = res.data;
+  const count = list.length;
+  const avg = count ? list.reduce((s, r) => s + r.rating, 0) / count : 0;
   const dist = [5, 4, 3, 2, 1].map((n) => [n, list.filter((r) => r.rating === n).length]);
   const shown = list.filter((r) => !stars || r.rating === stars).sort((a, b) => b.date.localeCompare(a.date));
 

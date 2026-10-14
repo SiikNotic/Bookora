@@ -1,19 +1,26 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Camera, LogOut, RotateCcw, UserRound } from 'lucide-react';
+import { Camera, Loader2, LogOut } from 'lucide-react';
 import DiagnosticsCard from '../../components/DiagnosticsCard';
-import { Avatar, Confirm, TopBar } from '../../components/ui';
-import { MUNICIPIOS } from '../../data/demoData';
+import { Avatar, TopBar } from '../../components/ui';
+import { signOut, updateBarber, uploadAvatar } from '../../lib/api';
 import { resizeImage } from '../../lib/images';
+import { MUNICIPIOS } from '../../lib/municipios';
 import { useStore } from '../../store/AppStore';
 import { MenuButton } from '../client/ClientProfile';
-import { useMyBarber } from './Dashboard';
+import { BarberGate, useMyBarber } from './Dashboard';
 
-/** Perfil público del barbero (lo que ven los clientes) + opciones de la demo. */
+/** Perfil público del barbero (lo que ven los clientes). */
 export default function BarberSettings() {
-  const { actions } = useStore();
-  const nav = useNavigate();
-  const me = useMyBarber();
+  const res = useMyBarber();
+  return (
+    <BarberGate title="Mi perfil" res={res}>
+      {(me) => <SettingsForm me={me} reload={res.reload} />}
+    </BarberGate>
+  );
+}
+
+function SettingsForm({ me, reload }) {
+  const { session, toast } = useStore();
   const photoInput = useRef(null);
   const [form, setForm] = useState({
     name: me.name,
@@ -24,25 +31,47 @@ export default function BarberSettings() {
     years: me.years,
     bio: me.bio,
   });
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const valid = form.name.trim() && form.shop.trim();
+  const valid = form.name.trim().length >= 2 && form.shop.trim() && form.address.trim();
 
   const onAvatar = async (e) => {
     const f = e.target.files[0];
     e.target.value = '';
     if (!f) return;
+    setUploading(true);
     try {
-      actions.updateBarber(me.id, { avatar: await resizeImage(f, 400) });
-      actions.toast('Foto de perfil actualizada');
+      await uploadAvatar(me.id, await resizeImage(f, 500));
+      toast('Foto de perfil actualizada');
+      reload();
     } catch (err) {
-      actions.toast(err.message, 'warn');
+      toast(err.message, 'warn');
+    } finally {
+      setUploading(false);
     }
   };
 
-  const exit = () => {
-    actions.logout();
-    nav('/');
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await updateBarber(me.id, {
+        ...form,
+        name: form.name.trim(),
+        shop: form.shop.trim(),
+        address: form.address.trim(),
+        phone: form.phone.trim(),
+        bio: form.bio.trim(),
+        years: Math.min(80, Math.max(0, Number(form.years) || 0)),
+      });
+      toast('Perfil guardado');
+      reload();
+    } catch (err) {
+      toast(err.message, 'warn');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -50,34 +79,22 @@ export default function BarberSettings() {
       <TopBar back="/barbero" title="Mi perfil" />
       <div className="px-4 pt-6">
         <div className="flex flex-col items-center">
-          <button onClick={() => photoInput.current.click()} className="relative" aria-label="Cambiar foto">
-            <Avatar name={me.name} src={me.avatar} size={96} />
+          <button onClick={() => photoInput.current.click()} className="relative" aria-label="Cambiar foto" disabled={uploading}>
+            <Avatar name={me.name || 'Barbero'} src={me.avatar} size={96} />
             <span className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full bg-accent text-accent-ink">
-              <Camera size={16} />
+              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
             </span>
           </button>
           <input ref={photoInput} type="file" accept="image/*" hidden onChange={onAvatar} />
-          <p className="mt-2 text-xs text-muted">Así te ven los clientes</p>
+          <p className="mt-2 text-xs text-muted">{session?.user?.email}</p>
         </div>
 
-        <form
-          className="mt-6 space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            actions.updateBarber(me.id, {
-              ...form,
-              name: form.name.trim(),
-              shop: form.shop.trim(),
-              years: Math.max(0, Number(form.years) || 0),
-            });
-            actions.toast('Perfil guardado');
-          }}
-        >
+        <form className="mt-6 space-y-4" onSubmit={save}>
           <Field label="Nombre público">
-            <input className="input" value={form.name} onChange={set('name')} maxLength={40} />
+            <input className="input" value={form.name} onChange={set('name')} maxLength={60} />
           </Field>
           <Field label="Barbería">
-            <input className="input" value={form.shop} onChange={set('shop')} maxLength={40} />
+            <input className="input" value={form.shop} onChange={set('shop')} maxLength={60} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Municipio">
@@ -88,45 +105,28 @@ export default function BarberSettings() {
               </select>
             </Field>
             <Field label="Años de experiencia">
-              <input className="input" type="number" min="0" max="60" value={form.years} onChange={set('years')} />
+              <input className="input" type="number" min="0" max="80" value={form.years} onChange={set('years')} />
             </Field>
           </div>
           <Field label="Dirección">
-            <input className="input" value={form.address} onChange={set('address')} maxLength={80} />
+            <input className="input" value={form.address} onChange={set('address')} maxLength={120} />
           </Field>
           <Field label="Teléfono">
-            <input className="input" inputMode="tel" value={form.phone} onChange={set('phone')} maxLength={20} />
+            <input className="input" inputMode="tel" value={form.phone} onChange={set('phone')} maxLength={25} />
           </Field>
           <Field label="Sobre mí">
-            <textarea className="input min-h-[100px] resize-none" value={form.bio} onChange={set('bio')} maxLength={240} />
+            <textarea className="input min-h-[100px] resize-none" value={form.bio} onChange={set('bio')} maxLength={300} />
           </Field>
-          <button type="submit" disabled={!valid} className="btn-primary w-full">
+          <button type="submit" disabled={!valid || saving} className="btn-primary w-full">
             Guardar cambios
           </button>
         </form>
 
-        <h2 className="mb-3 mt-8 font-semibold">Demo</h2>
-        <div className="card divide-y divide-line/60">
-          <MenuButton icon={UserRound} label="Cambiar a modo cliente / otro barbero" onClick={exit} />
-          <MenuButton icon={RotateCcw} label="Reiniciar datos de la demo" onClick={() => setConfirmReset(true)} />
-          <MenuButton icon={LogOut} label="Salir" onClick={exit} />
+        <div className="card mt-8 divide-y divide-line/60">
+          <MenuButton icon={LogOut} label="Cerrar sesión" onClick={() => signOut()} />
         </div>
         <DiagnosticsCard />
       </div>
-
-      <Confirm
-        open={confirmReset}
-        onClose={() => setConfirmReset(false)}
-        title="¿Reiniciar la demo?"
-        text="Se perderán tus cambios (servicios, horario, fotos, citas) y se cargarán los datos de ejemplo."
-        confirmLabel="Reiniciar"
-        danger
-        onConfirm={() => {
-          actions.resetDemo();
-          actions.toast('Demo reiniciada');
-          nav('/barbero');
-        }}
-      />
     </div>
   );
 }

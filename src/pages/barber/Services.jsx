@@ -1,17 +1,37 @@
 import { useState } from 'react';
 import { Clock, Pencil, Plus, Scissors, Trash2 } from 'lucide-react';
 import { Confirm, EmptyState, Sheet, TopBar } from '../../components/ui';
+import { deleteService, saveService } from '../../lib/api';
 import { duration, money } from '../../lib/format';
 import { useStore } from '../../store/AppStore';
-import { useMyBarber } from './Dashboard';
+import { BarberGate, useMyBarber } from './Dashboard';
 
 const DURATIONS = [15, 20, 25, 30, 40, 45, 50, 60, 70, 75, 90, 120];
 const EMPTY = { name: '', description: '', duration: 30, price: '' };
 
 export default function Services() {
-  const { actions } = useStore();
-  const me = useMyBarber();
+  const res = useMyBarber();
+  return (
+    <BarberGate title="Servicios y precios" res={res}>
+      {(me) => <ServicesView me={me} reload={res.reload} />}
+    </BarberGate>
+  );
+}
+
+function ServicesView({ me, reload }) {
+  const { toast } = useStore();
   const [editing, setEditing] = useState(null);
+  const save = async (fn, okMsg) => {
+    try {
+      await fn();
+      toast(okMsg);
+      reload();
+      return true;
+    } catch (e) {
+      toast(e.message, 'warn');
+      return false;
+    }
+  };
   const [toDelete, setToDelete] = useState(null);
 
   return (
@@ -73,10 +93,8 @@ export default function Services() {
         <ServiceForm
           service={editing}
           onClose={() => setEditing(null)}
-          onSave={(svc) => {
-            actions.saveService(me.id, svc);
-            actions.toast(svc.id ? 'Servicio actualizado' : 'Servicio añadido');
-            setEditing(null);
+          onSave={async (svc) => {
+            if (await save(() => saveService(me.id, svc), svc.id ? 'Servicio actualizado' : 'Servicio añadido')) setEditing(null);
           }}
         />
       )}
@@ -87,10 +105,7 @@ export default function Services() {
         text={`"${toDelete?.name}" dejará de aparecer para nuevas reservas. Las citas ya hechas se mantienen.`}
         confirmLabel="Eliminar"
         danger
-        onConfirm={() => {
-          actions.deleteService(me.id, toDelete.id);
-          actions.toast('Servicio eliminado');
-        }}
+        onConfirm={() => save(() => deleteService(toDelete.id), 'Servicio eliminado')}
       />
     </div>
   );

@@ -5,6 +5,8 @@ import { RoleGuard, TabsLayout } from './components/Layout';
 import { Toasts } from './components/ui';
 import { AppStoreProvider } from './store/AppStore';
 import Welcome from './pages/Welcome';
+import NewPassword from './pages/NewPassword';
+import PaymentResult from './pages/PaymentResult';
 import Explore from './pages/client/Explore';
 import BarberProfile from './pages/client/BarberProfile';
 import Booking from './pages/client/Booking';
@@ -45,6 +47,8 @@ export default function App() {
           <Screen>
             <Routes>
               <Route path="/" element={<Welcome />} />
+              <Route path="/nueva-clave" element={<NewPassword />} />
+              <Route path="/pago-resultado" element={<PaymentResult />} />
 
               <Route element={<TabsLayout role="cliente" />}>
                 <Route path="/cliente" element={<Explore />} />
