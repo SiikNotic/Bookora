@@ -43,10 +43,18 @@ function Appointments() {
   const days = useMemo(() => Array.from({ length: 21 }, (_, i) => addDays(today(), i - 3)), []);
   const [date, setDate] = useState(today());
 
+  // Regla: la agenda muestra TODAS las citas (cada una en su fila), pero las
+  // canceladas no cuentan en el contador ni en el total del día (su pago se
+  // reembolsó). Es la misma regla del punto del calendario, el Panel y Pagos.
   const mine = state.bookings.filter((b) => b.barberId === me.id);
-  const countFor = (d) => mine.filter((b) => b.date === d && b.status !== 'cancelada').length;
-  const list = mine.filter((b) => b.date === date).sort((a, b) => a.time.localeCompare(b.time));
-  const active = list.filter((b) => b.status !== 'cancelada');
+  const counts = (b) => b.status !== 'cancelada';
+  const countFor = (d) => mine.filter((b) => b.date === d && counts(b)).length;
+  const list = mine
+    .filter((b) => b.date === date)
+    // Mismo turno: la cita vigente va antes que la cancelada
+    .sort((a, b) => a.time.localeCompare(b.time) || counts(b) - counts(a));
+  const active = list.filter(counts);
+  const cancelled = list.length - active.length;
   const total = active.reduce((s, b) => s + b.price + b.tip, 0);
 
   return (
@@ -78,9 +86,10 @@ function Appointments() {
       <div className="px-4">
         <div className="mb-3 mt-5 flex items-end justify-between">
           <p className="font-semibold first-letter:uppercase">{formatDateLong(date)}</p>
-          {active.length > 0 && (
+          {list.length > 0 && (
             <p className="text-sm text-muted">
-              {active.length} citas · {money(total)}
+              {active.length} {active.length === 1 ? 'cita' : 'citas'} · {money(total)}
+              {cancelled > 0 && ` · ${cancelled} ${cancelled === 1 ? 'cancelada' : 'canceladas'}`}
             </p>
           )}
         </div>
