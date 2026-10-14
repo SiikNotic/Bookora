@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const session = await stripe(`checkout/sessions/${b.stripe_session_id}`);
     // La clave de idempotencia evita reembolsar dos veces si se repite la petición
     await stripe('refunds', { payment_intent: session.payment_intent }, `refund-${b.id}`);
-    await db.from('bookings').update({ status: 'cancelada', payment_status: 'reembolsado' }).eq('id', b.id);
+    await db.from('bookings').update({ status: 'cancelada', payment_status: 'reembolsado', cancelled_by: uid }).eq('id', b.id);
     return json({ ok: true });
   } catch (e) {
     if ((e as Error).message === 'STRIPE_NOT_CONFIGURED') return fail(503, 'El pago en línea no está activado.');
