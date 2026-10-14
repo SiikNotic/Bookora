@@ -32,6 +32,8 @@ android/               # Proyecto nativo de Capacitor
 - Solo se reserva dentro del horario del barbero (hora de PR), con 30 min de anticipación y hasta 90 días.
 - Un barbero no puede tener dos citas que se solapen (restricción en la base de datos).
 - El cliente cancela o reprograma hasta 2 horas antes; el barbero puede cancelar siempre.
+- El barbero puede **proponer otra hora**; la cita no cambia hasta que el cliente la acepta (si la rechaza, queda
+  como estaba).
 - Las citas con pago en línea que no se pagan en ~30 min se cancelan solas y liberan el turno.
 - Cada usuario solo ve sus citas; el rol (cliente/barbero) no se puede cambiar desde la app.
 - Los barberos aparecen para los clientes cuando tienen al menos un servicio.
@@ -80,6 +82,30 @@ se hace por fuera de la app (Stripe Connect sería el siguiente paso si quieres 
 
 ## APK de Android
 
+### Se actualiza solo
+
+El APK carga la app desde `https://bookora-pr.netlify.app` (`server.url` en `capacitor.config.json`). Cada vez que
+Netlify publica `main`, todos los teléfonos ven la versión nueva al abrir la app: **no hay que reinstalar el APK**.
+Solo hace falta un APK nuevo si cambia algo nativo (un plugin nuevo de Capacitor, permisos, el ícono). Sin internet
+se muestra una pantalla de "Sin conexión" con botón para reintentar.
+
+### Notificaciones (Firebase)
+
+Avisos en el teléfono con sonido: al barbero cuando le reservan, cancelan o responden a un cambio de hora; al cliente
+cuando el barbero propone otra hora o cancela. Cada usuario puede apagarlos o quitarles el sonido en su Perfil (y
+Android también deja silenciarlos desde los ajustes del sistema). Configuración, una sola vez:
+
+1. En [Firebase](https://console.firebase.google.com) crea un proyecto y agrega una app **Android** con el paquete
+   `pr.bookora.app`. Descarga `google-services.json`.
+2. GitHub → **Settings → Secrets and variables → Actions** → secreto `GOOGLE_SERVICES_JSON` con el contenido completo
+   de ese archivo. Vuelve a compilar el APK (Actions → APK Android → Run workflow) e instálalo una vez.
+3. Firebase → **Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada**. En Supabase →
+   **Edge Functions → Secrets** crea `FIREBASE_SERVICE_ACCOUNT` con el contenido completo de ese JSON.
+   **Es una clave secreta: no la subas al repositorio ni la compartas.**
+
+Sin el paso 2 el APK se compila sin notificaciones (todo lo demás funciona). Los avisos se generan en la base de datos
+(tabla `notification_queue`) y los envía la Edge Function `push`.
+
 Cada push a `main` o a la rama de trabajo ejecuta **GitHub → Actions → APK Android**, que compila la app y deja el
 APK en **Artifacts → bookora-apk** de esa ejecución.
 
@@ -116,6 +142,7 @@ Con Android Studio instalado: `npm run build && npx cap sync android && npx cap 
 
 - SMTP propio para los emails de Auth (ver arriba).
 - Stripe Connect si se quiere pagar automáticamente a cada barbero.
-- Notificaciones (recordatorio de cita por push o SMS).
+- Recordatorio automático antes de la cita (las notificaciones ya existen; falta la tarea programada).
+- Venta de productos por el barbero.
 - Publicación en Google Play (requiere la firma de producción y una cuenta de desarrollador).
 - Actualizar react-router a la v7 (las alertas de `npm audit` actuales no afectan a esta app).
